@@ -1,7 +1,7 @@
+
 {
   "name": "storm-ai",
   "version": "1.0.0",
-  "type": "module",
   "dependencies": {
     "axios": "^1.9.0"
   }
