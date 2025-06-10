@@ -6,11 +6,29 @@ export default function App() {
   ]);
   const [input, setInput] = useState('');
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
     const newMessages = [...messages, { sender: 'user', text: input }];
-    const response = { sender: 'bot', text: `You asked: "${input}" (This is a placeholder response).` };
-    setMessages([...newMessages, response]);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: input,
+          location: "unknown",  // can be replaced with real location
+          knowledgeLevel: "beginner" // can be updated later
+        })
+      });
+
+      const data = await res.json();
+      const botReply = { sender: 'bot', text: data.reply || "Sorry, I couldn't get a response." };
+      setMessages([...newMessages, botReply]);
+    } catch (err) {
+      const errorReply = { sender: 'bot', text: "Error: Failed to connect to Storm AI backend." };
+      setMessages([...newMessages, errorReply]);
+    }
+
     setInput('');
   };
 
