@@ -3,8 +3,7 @@ const axios = require('axios');
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { message, location, knowledgeLevel } = req.body;
-  const apiKey = process.env.OPENAI_API_KEY;
+  const { message, location = 'unknown', knowledgeLevel = 'beginner' } = req.body;
 
   try {
     const response = await axios.post(
@@ -24,16 +23,15 @@ export default async function handler(req, res) {
       },
       {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json'
         }
       }
     );
 
-    const result = response.data.choices[0].message.content;
-    res.status(200).json({ reply: result });
+    res.status(200).json({ reply: response.data.choices[0].message.content });
   } catch (error) {
-    console.error(error?.response?.data || error);
+    console.error("OpenAI Error:", error?.response?.data || error);
     res.status(500).json({ error: 'Failed to get response from OpenAI' });
   }
 }
