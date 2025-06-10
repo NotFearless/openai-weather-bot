@@ -11,7 +11,7 @@ export default function App() {
     const newMessages = [...messages, { sender: 'user', text: input }];
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch('https://openai-weather-bot.vercel.app/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
