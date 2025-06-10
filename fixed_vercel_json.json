@@ -1,18 +1,10 @@
 {
   "version": 2,
-  "installCommand": "npm install --legacy-peer-deps",
-  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "buildCommand": "CI=false npm run build",
   "functions": {
     "api/chat.js": {
       "runtime": "nodejs18.x"
     }
-  },
-  "builds": [
-    { "src": "package.json", "use": "@vercel/static-build" },
-    { "src": "api/chat.js", "use": "@vercel/node" }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/(.*)", "dest": "/$1" }
-  ]
+  }
 }
