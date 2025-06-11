@@ -107,6 +107,26 @@
             background-color: #ffebee;
             border-left: 4px solid #d32f2f;
         }
+        
+        .debug-info {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .test-button {
+            padding: 8px 16px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 10px 5px;
+        }
     </style>
 </head>
 <body>
@@ -114,11 +134,16 @@
         <div class="header">
             <h1>⛈️ Storm AI</h1>
             <p>Your intelligent weather assistant</p>
+            <button id="testButton" class="test-button">Test API Connection</button>
         </div>
         
         <div class="chat-container" id="chatContainer">
             <div class="message bot-message">
                 <strong>Storm AI:</strong> Welcome to Storm AI! Ask me about the weather in your area.
+                <div class="debug-info">
+                    Debug info: Current URL = <span id="currentUrl"></span><br>
+                    API URL will be: <span id="apiUrl"></span>
+                </div>
             </div>
         </div>
         
@@ -138,7 +163,12 @@
         const chatContainer = document.getElementById('chatContainer');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
+        const testButton = document.getElementById('testButton');
         let isLoading = false;
+
+        // Show current URLs for debugging
+        document.getElementById('currentUrl').textContent = window.location.href;
+        document.getElementById('apiUrl').textContent = window.location.origin + '/api/chat';
 
         function addMessage(sender, text, isError = false) {
             const messageDiv = document.createElement('div');
@@ -163,6 +193,26 @@
             }
         }
 
+        async function testAPI() {
+            try {
+                addMessage('bot', 'Testing API connection...');
+                const response = await fetch('/api/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ test: 'connection' })
+                });
+
+                const data = await response.json();
+                addMessage('bot', `API Test Result: ${JSON.stringify(data)}`);
+                
+            } catch (error) {
+                addMessage('bot', `API Test Failed: ${error.message}`, true);
+                console.error('API Test Error:', error);
+            }
+        }
+
         async function sendMessage() {
             const message = messageInput.value.trim();
             if (!message || isLoading) return;
@@ -173,7 +223,10 @@
             setLoading(true);
 
             try {
-                const response = await fetch('/api/chat', {
+                const apiUrl = '/api/chat';
+                console.log('Making request to:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -185,8 +238,12 @@
                     })
                 });
 
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
 
                 const data = await response.json();
@@ -195,17 +252,18 @@
                 if (data.reply) {
                     addMessage('bot', data.reply);
                 } else {
-                    addMessage('bot', 'Sorry, I couldn\'t generate a response. Please try again.', true);
+                    addMessage('bot', `No reply in response. Full response: ${JSON.stringify(data)}`, true);
                 }
             } catch (error) {
                 setLoading(false);
-                console.error('Error:', error);
-                addMessage('bot', 'Error: Failed to connect to Storm AI backend. Please check your connection and try again.', true);
+                console.error('Error details:', error);
+                addMessage('bot', `Connection Error: ${error.message}<br><div class="debug-info">Trying to connect to: ${window.location.origin}/api/chat<br>Error type: ${error.name}<br>Full error: ${error.toString()}</div>`, true);
             }
         }
 
         // Event listeners
         sendButton.addEventListener('click', sendMessage);
+        testButton.addEventListener('click', testAPI);
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !isLoading) {
                 sendMessage();
