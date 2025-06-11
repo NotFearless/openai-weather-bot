@@ -1,6 +1,7 @@
-const axios = require('axios');
+// api/chat.js
+import axios from 'axios';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -97,4 +98,4 @@ module.exports = async function handler(req, res) {
       });
     }
   }
-};
+}

@@ -1,4 +1,5 @@
-module.exports = function handler(req, res) {
+// api/test.js
+export default function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -14,13 +15,14 @@ module.exports = function handler(req, res) {
     return res.status(200).json({ 
       reply: "Test API is working! Your backend connection is successful.",
       receivedData: req.body,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      method: req.method
     });
   }
 
   return res.status(200).json({ 
-    message: "Test API is running",
+    message: "Test API is running - GET request",
     method: req.method,
     timestamp: new Date().toISOString()
   });
-};
+}
