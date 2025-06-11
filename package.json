@@ -1,13 +1,13 @@
 {
   "name": "ai-weather-bot",
   "version": "1.0.0",
-  "description": "AI-powered weather assistant with GPT-4 and real weather data",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
-  },
+  }
+}
   "dependencies": {
     "next": "^14.0.0",
     "react": "^18.0.0",

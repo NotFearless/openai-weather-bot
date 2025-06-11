@@ -1,4 +1,7 @@
 {
+  "buildCommand": "next build",
+  "devCommand": "next dev", 
+  "framework": "nextjs",
   "functions": {
     "pages/api/**/*.js": {
       "maxDuration": 30
