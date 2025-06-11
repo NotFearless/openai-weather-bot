@@ -2,7 +2,7 @@ import Head from 'next/head';
 import dynamic from 'next/dynamic';
 
 // Import WeatherBot with no SSR to avoid hydration errors
-const WeatherBot = dynamic(() => import('../components/Weatherbot'), {
+const WeatherBot = dynamic(() => import('../components/WeatherBot'), {
   ssr: false,
   loading: () => (
     <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg h-[600px] flex items-center justify-center">
