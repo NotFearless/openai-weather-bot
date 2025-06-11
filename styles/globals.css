@@ -19,12 +19,6 @@ a {
   box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
-}
-
 .animate-bounce-slow {
   animation: bounce 1s infinite;
 }
