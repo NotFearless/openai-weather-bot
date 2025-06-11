@@ -1,4 +1,5 @@
 import { generateWeatherResponse } from '../../lib/openai';
+import { generateWeatherResponse } from '../../lib/openai';
 import { getCurrentWeather, getWeatherForecast } from '../../lib/weather';
 
 export default async function handler(req, res) {
@@ -13,41 +14,35 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Debug: Check if API keys are loaded
-    console.log('OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
-    console.log('WEATHER_API_KEY exists:', !!process.env.WEATHER_API_KEY);
-
-    // Get weather data if location is provided
+    // Try to get weather data, but don't fail if it doesn't work
     let weatherData = null;
     if (location?.lat && location?.lon) {
-      const [currentWeather, forecast] = await Promise.all([
-        getCurrentWeather(location.lat, location.lon),
-        getWeatherForecast(location.lat, location.lon)
-      ]);
+      try {
+        const [currentWeather, forecast] = await Promise.all([
+          getCurrentWeather(location.lat, location.lon),
+          getWeatherForecast(location.lat, location.lon)
+        ]);
 
-      console.log('Weather API response:', { 
-        currentSuccess: currentWeather.success, 
-        forecastSuccess: forecast.success 
-      });
-
-      weatherData = {
-        current: currentWeather.success ? currentWeather.data : null,
-        forecast: forecast.success ? forecast.data : null,
-        location: location
-      };
+        if (currentWeather.success || forecast.success) {
+          weatherData = {
+            current: currentWeather.success ? currentWeather.data : null,
+            forecast: forecast.success ? forecast.data : null,
+            location: location
+          };
+        }
+      } catch (weatherError) {
+        console.log('Weather API failed, continuing without weather data:', weatherError.message);
+        // Continue without weather data
+      }
     }
 
-    // Generate AI response
+    // Generate AI response (this should work now)
     const aiResponse = await generateWeatherResponse(message, weatherData, conversationHistory);
-    
-    console.log('AI Response success:', aiResponse.success);
 
     if (!aiResponse.success) {
-      console.error('AI Response error:', aiResponse.error);
       return res.status(500).json({ 
         error: 'AI service unavailable',
-        fallback: aiResponse.fallback || "I'm having trouble connecting to the AI service. Please try again.",
-        debug: aiResponse.error
+        fallback: aiResponse.fallback 
       });
     }
 
@@ -61,8 +56,7 @@ export default async function handler(req, res) {
     console.error('Chat API Error:', error);
     return res.status(500).json({ 
       error: 'Internal server error',
-      fallback: "I'm experiencing technical difficulties. Please try again in a moment.",
-      debug: error.message
+      fallback: "I'm experiencing technical difficulties. Please try again in a moment."
     });
   }
 }
