@@ -1,5 +1,18 @@
 import Head from 'next/head';
-import WeatherBot from '../components/Weatherbot';
+import dynamic from 'next/dynamic';
+
+// Import WeatherBot with no SSR to avoid hydration errors
+const WeatherBot = dynamic(() => import('../components/WeatherBot'), {
+  ssr: false,
+  loading: () => (
+    <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg h-[600px] flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading AI Weather Assistant...</p>
+      </div>
+    </div>
+  )
+});
 
 export default function Home() {
   return (
