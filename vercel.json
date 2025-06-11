@@ -1,14 +1,11 @@
 {
-  "buildCommand": "next build",
-  "devCommand": "next dev", 
   "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
   "functions": {
     "pages/api/**/*.js": {
       "maxDuration": 30
     }
-  },
-  "env": {
-    "OPENAI_API_KEY": "@openai_api_key",
-    "WEATHER_API_KEY": "@weather_api_key"
   }
 }
