@@ -5,7 +5,7 @@ export default function Home() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: 'Hello! I\'m your AI weather assistant. Ask me about current conditions, forecasts, or any weather-related questions!',
+      content: 'Hello! I\'m your AI weather assistant. Ask me about current conditions, forecasts, or request visual weather images!',
       timestamp: new Date()
     }
   ]);
@@ -45,18 +45,18 @@ export default function Home() {
     }
   }, []);
 
-  const sendMessage = async (e) => {
-    e.preventDefault();
-    if (!inputMessage.trim() || isLoading) return;
+  const sendMessage = async (messageText = null, includeImages = true) => {
+    const textToSend = messageText || inputMessage.trim();
+    if (!textToSend || isLoading) return;
 
     const userMessage = {
       role: 'user',
-      content: inputMessage.trim(),
+      content: textToSend,
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
+    if (!messageText) setInputMessage('');
     setIsLoading(true);
 
     try {
@@ -66,12 +66,13 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: userMessage.content,
+          message: textToSend,
           location: location,
           conversationHistory: messages.slice(-6).map(msg => ({
             role: msg.role,
             content: msg.content
-          }))
+          })),
+          includeImages: includeImages
         })
       });
 
@@ -82,7 +83,9 @@ export default function Home() {
           role: 'assistant',
           content: data.response,
           timestamp: new Date(),
-          weatherData: data.weatherData
+          weatherData: data.weatherData,
+          images: data.images,
+          hasImages: data.hasImages
         };
         setMessages(prev => [...prev, assistantMessage]);
       } else {
@@ -102,29 +105,204 @@ export default function Home() {
     }
   };
 
-  const WeatherCard = ({ weatherData }) => {
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    sendMessage();
+  };
+
+  // Helper function for weather emojis
+  const getWeatherEmoji = (condition) => {
+    const emojiMap = {
+      'Clear': '☀️',
+      'Clouds': '☁️',
+      'Rain': '🌧️',
+      'Drizzle': '🌦️',
+      'Thunderstorm': '⛈️',
+      'Snow': '🌨️',
+      'Mist': '🌫️',
+      'Fog': '🌫️',
+      'Haze': '🌫️'
+    };
+    return emojiMap[condition] || '🌤️';
+  };
+
+  // Enhanced Weather Card Component
+  const EnhancedWeatherCard = ({ weatherData, images }) => {
     if (!weatherData?.current) return null;
 
     const temp = Math.round(weatherData.current.main?.temp || 0);
     const description = weatherData.current.weather?.[0]?.description || '';
     const locationName = weatherData.current.name || '';
+    const humidity = weatherData.current.main?.humidity || 0;
+    const windSpeed = Math.round(weatherData.current.wind?.speed || 0);
+    const feelsLike = Math.round(weatherData.current.main?.feels_like || 0);
 
     return (
       <div style={{ 
-        marginTop: '12px', 
-        padding: '16px', 
+        marginTop: '16px', 
         border: '1px solid #e5e7eb', 
-        borderRadius: '8px', 
-        backgroundColor: '#f9fafb'
+        borderRadius: '12px', 
+        backgroundColor: 'white',
+        overflow: 'hidden',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ fontSize: '24px' }}>🌤️</div>
-          <div>
-            <div style={{ fontWeight: '600', color: '#111827' }}>{locationName}</div>
-            <div style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>{temp}°F</div>
-            <div style={{ color: '#6b7280', textTransform: 'capitalize' }}>{description}</div>
+        {/* Weather Scene Image */}
+        {images?.weatherScene?.success && (
+          <div style={{ position: 'relative', height: '200px', overflow: 'hidden' }}>
+            <img 
+              src={images.weatherScene.imageUrl}
+              alt={`Weather scene showing ${description}`}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover'
+              }}
+            />
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.1))'
+            }} />
+            <div style={{
+              position: 'absolute',
+              top: '16px',
+              left: '16px',
+              color: 'white',
+              textShadow: '0 2px 4px rgba(0,0,0,0.5)'
+            }}>
+              <div style={{ fontSize: '24px', fontWeight: '700' }}>{temp}°F</div>
+              <div style={{ fontSize: '14px', opacity: 0.9 }}>Feels like {feelsLike}°F</div>
+            </div>
+          </div>
+        )}
+
+        {/* Weather Details */}
+        <div style={{ padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div>
+              <div style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+                {locationName}
+              </div>
+              <div style={{ fontSize: '14px', color: '#6b7280', textTransform: 'capitalize' }}>
+                {description}
+              </div>
+            </div>
+            {!images?.weatherScene?.success && (
+              <div style={{ fontSize: '48px' }}>
+                {getWeatherEmoji(weatherData.current.weather?.[0]?.main)}
+              </div>
+            )}
+          </div>
+
+          {/* Weather Stats Grid */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(3, 1fr)', 
+            gap: '12px',
+            padding: '12px',
+            backgroundColor: '#f9fafb',
+            borderRadius: '8px'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#6b7280' }}>Humidity</div>
+              <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>{humidity}%</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#6b7280' }}>Wind</div>
+              <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>{windSpeed} mph</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#6b7280' }}>Feels Like</div>
+              <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>{feelsLike}°F</div>
+            </div>
           </div>
         </div>
+      </div>
+    );
+  };
+
+  // Forecast Chart Component
+  const ForecastChart = ({ images, forecastData }) => {
+    if (!images?.forecastChart?.success && !forecastData) return null;
+
+    return (
+      <div style={{ 
+        marginTop: '16px', 
+        border: '1px solid #e5e7eb', 
+        borderRadius: '12px', 
+        backgroundColor: 'white',
+        overflow: 'hidden',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+      }}>
+        <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>
+            5-Day Forecast
+          </h3>
+        </div>
+
+        {images?.forecastChart?.success ? (
+          <div style={{ padding: '16px' }}>
+            <img 
+              src={images.forecastChart.imageUrl}
+              alt="5-day weather forecast chart"
+              style={{
+                width: '100%',
+                height: 'auto',
+                borderRadius: '8px'
+              }}
+            />
+          </div>
+        ) : (
+          <div style={{ padding: '16px' }}>
+            <div style={{ fontSize: '14px', color: '#6b7280' }}>
+              {images?.forecastChart?.fallbackChart || 'Forecast data not available'}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Weather Image Request Buttons
+  const WeatherImageButtons = ({ onImageRequest }) => {
+    const buttons = [
+      { id: 'scene', label: '📸 Show Current Scene', prompt: 'Show me a visual of the current weather' },
+      { id: 'forecast', label: '📊 Forecast Chart', prompt: 'Create a visual forecast chart for the week' },
+      { id: 'map', label: '🗺️ Weather Map', prompt: 'Show me a weather map of my area' }
+    ];
+
+    return (
+      <div style={{ 
+        marginTop: '12px',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '8px'
+      }}>
+        {buttons.map(button => (
+          <button
+            key={button.id}
+            onClick={() => onImageRequest(button.prompt)}
+            disabled={isLoading}
+            style={{
+              padding: '8px 12px',
+              fontSize: '13px',
+              backgroundColor: '#f3f4f6',
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              borderRadius: '20px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              opacity: isLoading ? 0.5 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            {button.label}
+          </button>
+        ))}
       </div>
     );
   };
@@ -132,7 +310,7 @@ export default function Home() {
   const clearChat = () => {
     setMessages([{
       role: 'assistant',
-      content: 'Hello! I\'m your AI weather assistant. Ask me about current conditions, forecasts, or any weather-related questions!',
+      content: 'Hello! I\'m your AI weather assistant. Ask me about current conditions, forecasts, or request visual weather images!',
       timestamp: new Date()
     }]);
   };
@@ -141,7 +319,7 @@ export default function Home() {
     <>
       <Head>
         <title>WeatherGPT</title>
-        <meta name="description" content="AI-powered weather assistant" />
+        <meta name="description" content="AI-powered weather assistant with image generation" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -179,38 +357,43 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Chat history */}
+          {/* Features List */}
           <div style={{ flex: 1, padding: '16px' }}>
             <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>
-              Previous conversations
+              AI Weather Features
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ 
                 fontSize: '14px', 
                 color: '#d1d5db', 
                 padding: '8px', 
-                borderRadius: '4px', 
-                cursor: 'pointer' 
+                borderRadius: '4px' 
               }}>
-                Today's weather forecast
+                📸 Weather Scene Images
               </div>
               <div style={{ 
                 fontSize: '14px', 
                 color: '#d1d5db', 
                 padding: '8px', 
-                borderRadius: '4px', 
-                cursor: 'pointer' 
+                borderRadius: '4px' 
               }}>
-                Weekend plans check
+                📊 Visual Forecasts
               </div>
               <div style={{ 
                 fontSize: '14px', 
                 color: '#d1d5db', 
                 padding: '8px', 
-                borderRadius: '4px', 
-                cursor: 'pointer' 
+                borderRadius: '4px' 
               }}>
-                Storm warning alerts
+                🗺️ Weather Maps
+              </div>
+              <div style={{ 
+                fontSize: '14px', 
+                color: '#d1d5db', 
+                padding: '8px', 
+                borderRadius: '4px' 
+              }}>
+                💬 Smart Weather Chat
               </div>
             </div>
           </div>
@@ -265,7 +448,7 @@ export default function Home() {
                     WeatherGPT
                   </h1>
                   <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
-                    AI Weather Assistant
+                    AI Weather Assistant with Visual Generation
                   </p>
                 </div>
               </div>
@@ -317,8 +500,25 @@ export default function Home() {
                         {message.content}
                       </div>
                       
+                      {/* Enhanced Weather Card */}
                       {message.weatherData && (
-                        <WeatherCard weatherData={message.weatherData} />
+                        <EnhancedWeatherCard 
+                          weatherData={message.weatherData} 
+                          images={message.images || {}} 
+                        />
+                      )}
+
+                      {/* Forecast Chart */}
+                      {message.images?.forecastChart && (
+                        <ForecastChart 
+                          images={message.images} 
+                          forecastData={message.weatherData?.forecast}
+                        />
+                      )}
+
+                      {/* Weather Image Request Buttons */}
+                      {message.role === 'assistant' && location && !message.isError && (
+                        <WeatherImageButtons onImageRequest={sendMessage} />
                       )}
                     </div>
                   </div>
@@ -364,7 +564,7 @@ export default function Home() {
                         animation: 'pulse 1.5s ease-in-out infinite',
                         animationDelay: '0.4s'
                       }}></div>
-                      <span style={{ marginLeft: '8px' }}>WeatherGPT is thinking...</span>
+                      <span style={{ marginLeft: '8px' }}>WeatherGPT is generating your response...</span>
                     </div>
                   </div>
                 </div>
@@ -381,7 +581,7 @@ export default function Home() {
             padding: '16px 24px' 
           }}>
             <div style={{ maxWidth: '768px', margin: '0 auto' }}>
-              <form onSubmit={sendMessage}>
+              <form onSubmit={handleFormSubmit}>
                 <div style={{ 
                   display: 'flex', 
                   alignItems: 'end', 
@@ -397,10 +597,10 @@ export default function Home() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        sendMessage(e);
+                        handleFormSubmit(e);
                       }
                     }}
-                    placeholder="Ask about weather conditions, forecasts, or anything weather-related..."
+                    placeholder="Ask about weather conditions, forecasts, or request visual weather images..."
                     style={{
                       flex: 1,
                       resize: 'none',
@@ -444,13 +644,13 @@ export default function Home() {
                 </div>
               </form>
               
-              {/* Suggestions */}
+              {/* Enhanced Suggestions */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
                 {[
                   "What's the weather like today?",
-                  "Will it rain tomorrow?",
-                  "Should I bring an umbrella?",
-                  "Weekend forecast"
+                  "📸 Show me current weather scene",
+                  "📊 Create forecast chart",
+                  "🗺️ Weather map view"
                 ].map((suggestion, index) => (
                   <button
                     key={index}
@@ -479,7 +679,7 @@ export default function Home() {
                 textAlign: 'center', 
                 margin: '12px 0 0 0' 
               }}>
-                WeatherGPT can make mistakes. Verify important weather information with official sources.
+                WeatherGPT can generate AI images and make mistakes. Verify important weather information with official sources.
               </p>
             </div>
           </div>

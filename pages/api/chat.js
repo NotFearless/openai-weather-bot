@@ -1,5 +1,6 @@
 import { generateWeatherResponse } from '../../lib/openai';
 import { getCurrentWeather, getWeatherForecast } from '../../lib/weather';
+import { generateEnhancedWeatherResponse } from '../../lib/weatherImages';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -7,13 +8,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message, location, conversationHistory } = req.body;
+    const { message, location, conversationHistory, includeImages = true } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Try to get weather data, but don't fail if it doesn't work
+    // Try to get weather data
     let weatherData = null;
     if (location?.lat && location?.lon) {
       try {
@@ -31,11 +32,10 @@ export default async function handler(req, res) {
         }
       } catch (weatherError) {
         console.log('Weather API failed, continuing without weather data:', weatherError.message);
-        // Continue without weather data
       }
     }
 
-    // Generate AI response (this should work now)
+    // Generate AI response
     const aiResponse = await generateWeatherResponse(message, weatherData, conversationHistory);
 
     if (!aiResponse.success) {
@@ -45,9 +45,23 @@ export default async function handler(req, res) {
       });
     }
 
+    // Generate enhanced response with images
+    let imageResults = { images: {}, hasImages: false };
+    
+    if (weatherData && includeImages) {
+      imageResults = await generateEnhancedWeatherResponse(
+        message, 
+        weatherData, 
+        conversationHistory, 
+        includeImages
+      );
+    }
+
     return res.status(200).json({
       response: aiResponse.response,
       weatherData,
+      images: imageResults.images,
+      hasImages: imageResults.hasImages,
       usage: aiResponse.usage
     });
 
