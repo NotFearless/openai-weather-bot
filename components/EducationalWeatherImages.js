@@ -1,634 +1,521 @@
-// pages/index.js - Integration example for educational images
-import { useState, useEffect, useRef } from 'react';
-import Head from 'next/head';
-import { EducationalImageGallery, RadarImageDisplay } from '../components/EducationalWeatherImages';
+// components/EducationalWeatherImages.js - Fixed exports
+import React, { useState } from 'react';
+import { ChevronLeft, ChevronRight, Eye, ExternalLink, BookOpen, Zap } from 'lucide-react';
 
-export default function Home() {
-  // ... (keep all your existing state and functions)
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: 'Hello! I\'m your AI weather assistant. Ask me about current conditions, forecasts, or request visual weather images! I can also help you learn about weather patterns with real radar and satellite imagery.',
-      timestamp: new Date()
+// Educational Image Gallery Component
+const EducationalImageGallery = ({ images, topic, isEducational }) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  if (!images || Object.keys(images).length === 0) return null;
+
+  // Flatten all images into a single array with category info
+  const allImages = [];
+  Object.entries(images).forEach(([category, categoryImages]) => {
+    if (Array.isArray(categoryImages)) {
+      categoryImages.forEach(image => {
+        allImages.push({
+          ...image,
+          category,
+          categoryLabel: getCategoryLabel(category)
+        });
+      });
     }
-  ]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [location, setLocation] = useState(null);
-  const [locationError, setLocationError] = useState('');
-  const messagesEndRef = useRef(null);
+  });
 
-  // ... (keep all your existing useEffect hooks and functions)
+  if (allImages.length === 0) return null;
 
-  // Enhanced Weather Card Component with Educational Images
-  const EnhancedWeatherCard = ({ weatherData, images, isEducational, educationalTopic }) => {
-    if (!weatherData?.current) return null;
+  // Filter images based on selected category
+  const filteredImages = selectedCategory === 'all' 
+    ? allImages 
+    : allImages.filter(img => img.category === selectedCategory);
 
-    const temp = Math.round(weatherData.current.main?.temp || 0);
-    const description = weatherData.current.weather?.[0]?.description || '';
-    const locationName = weatherData.current.name || '';
-    const humidity = weatherData.current.main?.humidity || 0;
-    const windSpeed = Math.round(weatherData.current.wind?.speed || 0);
-    const feelsLike = Math.round(weatherData.current.main?.feels_like || 0);
-
-    return (
-      <div style={{ 
-        marginTop: '16px', 
-        border: '1px solid #e5e7eb', 
-        borderRadius: '12px', 
-        backgroundColor: 'white',
-        overflow: 'hidden',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-      }}>
-        {/* Weather Scene Image */}
-        {images?.weatherScene?.success && (
-          <div style={{ position: 'relative', height: '200px', overflow: 'hidden' }}>
-            <img 
-              src={images.weatherScene.imageUrl}
-              alt={`Weather scene showing ${description}`}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover'
-              }}
-            />
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.1))'
-            }} />
-            <div style={{
-              position: 'absolute',
-              top: '16px',
-              left: '16px',
-              color: 'white',
-              textShadow: '0 2px 4px rgba(0,0,0,0.5)'
-            }}>
-              <div style={{ fontSize: '24px', fontWeight: '700' }}>{temp}°F</div>
-              <div style={{ fontSize: '14px', opacity: 0.9 }}>Feels like {feelsLike}°F</div>
-            </div>
-          </div>
-        )}
-
-        {/* Weather Details */}
-        <div style={{ padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <div>
-              <div style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>
-                {locationName}
-              </div>
-              <div style={{ fontSize: '14px', color: '#6b7280', textTransform: 'capitalize' }}>
-                {description}
-              </div>
-            </div>
-            {!images?.weatherScene?.success && (
-              <div style={{ fontSize: '48px' }}>
-                {getWeatherEmoji(weatherData.current.weather?.[0]?.main)}
-              </div>
-            )}
-          </div>
-
-          {/* Weather Stats Grid */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(3, 1fr)', 
-            gap: '12px',
-            padding: '12px',
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px'
-          }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>Humidity</div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>{humidity}%</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>Wind</div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>{windSpeed} mph</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>Feels Like</div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>{feelsLike}°F</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Educational Images Gallery */}
-        {(isEducational || Object.keys(images || {}).length > 0) && (
-          <div style={{ borderTop: '1px solid #e5e7eb' }}>
-            <EducationalImageGallery 
-              images={images} 
-              topic={educationalTopic}
-              isEducational={isEducational}
-            />
-          </div>
-        )}
-
-        {/* Radar Display for radar-specific queries */}
-        {images?.radar && images.radar.length > 0 && (
-          <div style={{ borderTop: '1px solid #e5e7eb' }}>
-            <RadarImageDisplay 
-              radarImages={images.radar} 
-              location={location}
-            />
-          </div>
-        )}
-      </div>
-    );
+  const currentImage = filteredImages[currentImageIndex] || filteredImages[0];
+  
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => (prev + 1) % filteredImages.length);
   };
 
-  // Updated Weather Image Request Buttons with Educational Options
-  const WeatherImageButtons = ({ onImageRequest }) => {
-    const buttons = [
-      { id: 'scene', label: '📸 Current Scene', prompt: 'Show me a visual of the current weather' },
-      { id: 'radar', label: '📡 Live Radar', prompt: 'Show me the current radar for my area' },
-      { id: 'forecast', label: '📊 Forecast Chart', prompt: 'Create a visual forecast chart for the week' },
-      { id: 'education', label: '📚 Weather Education', prompt: 'How do I read weather radar?' },
-      { id: 'tornado', label: '🌪️ Tornado Radar', prompt: 'Show me how to identify tornadoes on radar' },
-      { id: 'satellite', label: '🛰️ Satellite View', prompt: 'Show me satellite imagery of my area' }
-    ];
-
-    return (
-      <div style={{ 
-        marginTop: '12px',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '8px'
-      }}>
-        {buttons.map(button => (
-          <button
-            key={button.id}
-            onClick={() => onImageRequest(button.prompt)}
-            disabled={isLoading}
-            style={{
-              padding: '8px 12px',
-              fontSize: '13px',
-              backgroundColor: '#f3f4f6',
-              color: '#374151',
-              border: '1px solid #d1d5db',
-              borderRadius: '20px',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              opacity: isLoading ? 0.5 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            {button.label}
-          </button>
-        ))}
-      </div>
-    );
+  const prevImage = () => {
+    setCurrentImageIndex((prev) => (prev - 1 + filteredImages.length) % filteredImages.length);
   };
 
-  // Updated message rendering to include educational context
-  const renderMessage = (message, index) => (
-    <div 
-      key={index} 
-      style={{ 
-        marginBottom: '24px', 
-        display: 'flex', 
-        gap: '16px',
-        flexDirection: message.role === 'user' ? 'row-reverse' : 'row'
-      }}
-    >
-      {/* Avatar */}
-      <div style={{ 
-        width: '32px', 
-        height: '32px', 
-        borderRadius: '50%', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        flexShrink: 0,
-        backgroundColor: message.role === 'user' ? '#3b82f6' : '#10b981'
-      }}>
-        {message.role === 'user' ? (
-          <span style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>U</span>
-        ) : (
-          <span style={{ color: 'white', fontSize: '14px' }}>
-            {message.isEducational ? '📚' : '⚡'}
-          </span>
-        )}
-      </div>
-
-      {/* Message content */}
-      <div style={{ flex: 1, maxWidth: 'none' }}>
-        <div style={{ 
-          color: message.isError ? '#dc2626' : '#111827',
-          lineHeight: '1.6'
-        }}>
-          <div style={{ whiteSpace: 'pre-wrap' }}>
-            {message.content}
-          </div>
-          
-          {/* Enhanced Weather Card with Educational Support */}
-          {message.weatherData && (
-            <EnhancedWeatherCard 
-              weatherData={message.weatherData} 
-              images={message.images || {}}
-              isEducational={message.isEducational}
-              educationalTopic={message.educationalTopic}
-            />
-          )}
-
-          {/* Standalone Educational Images */}
-          {message.isEducational && message.images && !message.weatherData && (
-            <EducationalImageGallery 
-              images={message.images}
-              topic={message.educationalTopic}
-              isEducational={true}
-            />
-          )}
-
-          {/* Weather Image Request Buttons */}
-          {message.role === 'assistant' && location && !message.isError && (
-            <WeatherImageButtons onImageRequest={sendMessage} />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  // ... (keep all your existing helper functions like getWeatherEmoji, etc.)
+  const categories = [...new Set(allImages.map(img => img.category))];
 
   return (
-    <>
-      <Head>
-        <title>WeatherGPT - AI Weather Assistant with Education</title>
-        <meta name="description" content="AI-powered weather assistant with educational radar and satellite imagery" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-
-      <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f9fafb' }}>
-        {/* Sidebar with Enhanced Features */}
-        <div style={{ 
-          width: '260px', 
-          backgroundColor: '#111827', 
-          color: 'white', 
-          display: 'flex', 
-          flexDirection: 'column' 
-        }}>
-          {/* Header */}
-          <div style={{ padding: '16px', borderBottom: '1px solid #374151' }}>
-            <button
-              onClick={clearChat}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px',
-                borderRadius: '6px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                color: 'white',
-                cursor: 'pointer'
-              }}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#374151'}
-              onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
-            >
-              <span style={{ fontSize: '16px' }}>+</span>
-              New chat
-            </button>
-          </div>
-
-          {/* Features List - Enhanced */}
-          <div style={{ flex: 1, padding: '16px' }}>
-            <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>
-              AI Weather Features
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '14px', color: '#d1d5db', padding: '8px', borderRadius: '4px' }}>
-                📡 Live Radar & Satellite
-              </div>
-              <div style={{ fontSize: '14px', color: '#d1d5db', padding: '8px', borderRadius: '4px' }}>
-                📚 Weather Education
-              </div>
-              <div style={{ fontSize: '14px', color: '#d1d5db', padding: '8px', borderRadius: '4px' }}>
-                🌪️ Tornado Detection
-              </div>
-              <div style={{ fontSize: '14px', color: '#d1d5db', padding: '8px', borderRadius: '4px' }}>
-                📸 Weather Scene Images
-              </div>
-              <div style={{ fontSize: '14px', color: '#d1d5db', padding: '8px', borderRadius: '4px' }}>
-                📊 Visual Forecasts
-              </div>
-              <div style={{ fontSize: '14px', color: '#d1d5db', padding: '8px', borderRadius: '4px' }}>
-                💬 Smart Weather Chat
-              </div>
-            </div>
-
-            {/* Educational Quick Access */}
-            <div style={{ marginTop: '24px' }}>
-              <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>
-                Quick Learning
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {[
-                  { label: 'Radar Basics', prompt: 'How do I read weather radar?' },
-                  { label: 'Tornado Signs', prompt: 'Show me tornado radar signatures' },
-                  { label: 'Hurricane Structure', prompt: 'Explain hurricane anatomy with images' },
-                  { label: 'Storm Types', prompt: 'What are different types of thunderstorms?' }
-                ].map((item, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setInputMessage(item.prompt)}
-                    style={{
-                      fontSize: '12px',
-                      color: '#9ca3af',
-                      padding: '6px 8px',
-                      borderRadius: '4px',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseOver={(e) => e.target.style.backgroundColor = '#374151'}
-                    onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* User info */}
-          <div style={{ padding: '16px', borderTop: '1px solid #374151' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ 
-                width: '32px', 
-                height: '32px', 
-                backgroundColor: '#3b82f6', 
-                borderRadius: '50%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
+    <div style={{ 
+      marginTop: '16px', 
+      background: 'linear-gradient(to bottom right, #eff6ff, #e0e7ff)',
+      borderRadius: '12px', 
+      border: '1px solid #bfdbfe', 
+      overflow: 'hidden' 
+    }}>
+      {/* Header */}
+      <div style={{ 
+        background: 'linear-gradient(to right, #2563eb, #4f46e5)', 
+        color: 'white', 
+        padding: '16px' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BookOpen style={{ width: '20px', height: '20px' }} />
+            <h3 style={{ fontWeight: '600', margin: 0 }}>
+              {isEducational ? 'Weather Education' : 'Weather Images'}
+            </h3>
+            {topic && (
+              <span style={{ 
+                backgroundColor: 'rgba(255,255,255,0.2)', 
+                fontSize: '12px', 
+                padding: '4px 8px', 
+                borderRadius: '4px' 
               }}>
-                <span style={{ fontSize: '14px', fontWeight: '500' }}>U</span>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: '500' }}>Weather Student</div>
-                <div style={{ fontSize: '12px', color: '#9ca3af' }}>
-                  {location ? '📍 Location detected' : 'Getting location...'}
-                </div>
-              </div>
-            </div>
+                {formatTopicName(topic)}
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: '14px', opacity: 0.9 }}>
+            {currentImageIndex + 1} of {filteredImages.length}
           </div>
         </div>
 
-        {/* Main content */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {/* Top bar - Enhanced */}
-          <div style={{ 
-            backgroundColor: 'white', 
-            borderBottom: '1px solid #e5e7eb', 
-            padding: '16px 24px' 
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ 
-                  width: '32px', 
-                  height: '32px', 
-                  backgroundColor: '#10b981', 
-                  borderRadius: '50%', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center' 
-                }}>
-                  <span style={{ color: 'white', fontSize: '16px' }}>⚡</span>
-                </div>
-                <div>
-                  <h1 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', margin: 0 }}>
-                    WeatherGPT Educational
-                  </h1>
-                  <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
-                    AI Weather Assistant with Real Radar & Educational Images
-                  </p>
-                </div>
-              </div>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                  {location ? '📍 Location enabled' : locationError}
-                </div>
-                <div style={{ 
-                  fontSize: '12px', 
-                  color: '#059669',
-                  backgroundColor: '#d1fae5',
-                  padding: '4px 8px',
-                  borderRadius: '12px',
-                  fontWeight: '500'
-                }}>
-                  📚 Education Mode
-                </div>
-              </div>
-            </div>
+        {/* Category Filters */}
+        {categories.length > 1 && (
+          <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <button
+              onClick={() => {
+                setSelectedCategory('all');
+                setCurrentImageIndex(0);
+              }}
+              style={{
+                padding: '4px 12px',
+                fontSize: '12px',
+                borderRadius: '20px',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                backgroundColor: selectedCategory === 'all' ? 'white' : 'rgba(255,255,255,0.2)',
+                color: selectedCategory === 'all' ? '#2563eb' : 'white'
+              }}
+            >
+              All ({allImages.length})
+            </button>
+            {categories.map(category => {
+              const count = allImages.filter(img => img.category === category).length;
+              return (
+                <button
+                  key={category}
+                  onClick={() => {
+                    setSelectedCategory(category);
+                    setCurrentImageIndex(0);
+                  }}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '12px',
+                    borderRadius: '20px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    backgroundColor: selectedCategory === category ? 'white' : 'rgba(255,255,255,0.2)',
+                    color: selectedCategory === category ? '#2563eb' : 'white'
+                  }}
+                >
+                  {getCategoryLabel(category)} ({count})
+                </button>
+              );
+            })}
           </div>
+        )}
+      </div>
 
-          {/* Messages area */}
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <div style={{ maxWidth: '768px', margin: '0 auto', padding: '24px' }}>
-              {messages.map((message, index) => renderMessage(message, index))}
+      {/* Main Image Display */}
+      <div style={{ position: 'relative' }}>
+        <div style={{ 
+          aspectRatio: '16/9', 
+          backgroundColor: '#f3f4f6', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          position: 'relative', 
+          overflow: 'hidden' 
+        }}>
+          {currentImage ? (
+            <>
+              <img
+                src={currentImage.url}
+                alt={currentImage.description || 'Weather educational image'}
+                style={{ 
+                  maxWidth: '100%', 
+                  maxHeight: '100%', 
+                  objectFit: 'contain' 
+                }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+              {/* Fallback for broken images */}
+              <div style={{ 
+                position: 'absolute', 
+                inset: 0, 
+                backgroundColor: '#e5e7eb', 
+                display: 'none', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                color: '#6b7280',
+                flexDirection: 'column'
+              }}>
+                <Eye style={{ width: '32px', height: '32px', marginBottom: '8px', opacity: 0.5 }} />
+                <p style={{ fontSize: '14px', margin: 0 }}>Image unavailable</p>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#6b7280' }}>
+              <Eye style={{ width: '32px', height: '32px', margin: '0 auto 8px', opacity: 0.5 }} />
+              <p style={{ margin: 0 }}>No images available</p>
+            </div>
+          )}
+
+          {/* Navigation arrows */}
+          {filteredImages.length > 1 && (
+            <>
+              <button
+                onClick={prevImage}
+                style={{
+                  position: 'absolute',
+                  left: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  color: 'white',
+                  padding: '8px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(0,0,0,0.7)'}
+                onMouseOut={(e) => e.target.style.backgroundColor = 'rgba(0,0,0,0.5)'}
+              >
+                <ChevronLeft style={{ width: '20px', height: '20px' }} />
+              </button>
+              <button
+                onClick={nextImage}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  color: 'white',
+                  padding: '8px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(0,0,0,0.7)'}
+                onMouseOut={(e) => e.target.style.backgroundColor = 'rgba(0,0,0,0.5)'}
+              >
+                <ChevronRight style={{ width: '20px', height: '20px' }} />
+              </button>
+            </>
+          )}
+
+          {/* Image type indicator */}
+          <div style={{ position: 'absolute', top: '8px', left: '8px' }}>
+            <span style={{ 
+              backgroundColor: 'rgba(0,0,0,0.7)', 
+              color: 'white', 
+              fontSize: '12px', 
+              padding: '4px 8px', 
+              borderRadius: '4px' 
+            }}>
+              {getImageTypeIcon(currentImage?.type)} {currentImage?.categoryLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Image Information */}
+        {currentImage && (
+          <div style={{ padding: '16px', backgroundColor: 'white', borderTop: '1px solid #bfdbfe' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <h4 style={{ fontWeight: '500', color: '#111827', margin: '0 0 8px 0' }}>
+                {currentImage.description || 'Weather Image'}
+              </h4>
               
-              {/* Loading indicator */}
-              {isLoading && (
-                <div style={{ marginBottom: '24px', display: 'flex', gap: '16px' }}>
-                  <div style={{ 
-                    width: '32px', 
-                    height: '32px', 
-                    backgroundColor: '#10b981', 
-                    borderRadius: '50%', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center' 
-                  }}>
-                    <span style={{ color: 'white', fontSize: '14px' }}>⚡</span>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#6b7280' }}>
-                      <div style={{ 
-                        width: '8px', 
-                        height: '8px', 
-                        backgroundColor: '#9ca3af', 
-                        borderRadius: '50%', 
-                        animation: 'pulse 1.5s ease-in-out infinite' 
-                      }}></div>
-                      <div style={{ 
-                        width: '8px', 
-                        height: '8px', 
-                        backgroundColor: '#9ca3af', 
-                        borderRadius: '50%', 
-                        animation: 'pulse 1.5s ease-in-out infinite',
-                        animationDelay: '0.2s'
-                      }}></div>
-                      <div style={{ 
-                        width: '8px', 
-                        height: '8px', 
-                        backgroundColor: '#9ca3af', 
-                        borderRadius: '50%', 
-                        animation: 'pulse 1.5s ease-in-out infinite',
-                        animationDelay: '0.4s'
-                      }}></div>
-                      <span style={{ marginLeft: '8px' }}>
-                        WeatherGPT is analyzing weather data and finding educational images...
-                      </span>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                fontSize: '14px', 
+                color: '#6b7280' 
+              }}>
+                <span>Source: {currentImage.source || 'Unknown'}</span>
+                {currentImage.station && (
+                  <span>Station: {currentImage.station}</span>
+                )}
+              </div>
+
+              {/* Educational explanation */}
+              {isEducational && currentImage.category === 'educational' && (
+                <div style={{ 
+                  marginTop: '12px', 
+                  padding: '12px', 
+                  backgroundColor: '#eff6ff', 
+                  borderRadius: '8px', 
+                  border: '1px solid #bfdbfe' 
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <Zap style={{ width: '16px', height: '16px', color: '#2563eb', marginTop: '2px', flexShrink: 0 }} />
+                    <div style={{ fontSize: '14px', color: '#1e40af' }}>
+                      {getEducationalExplanation(currentImage, topic)}
                     </div>
                   </div>
                 </div>
               )}
-              
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
 
-          {/* Input area - Enhanced */}
-          <div style={{ 
-            backgroundColor: 'white', 
-            borderTop: '1px solid #e5e7eb', 
-            padding: '16px 24px' 
-          }}>
-            <div style={{ maxWidth: '768px', margin: '0 auto' }}>
-              <form onSubmit={handleFormSubmit}>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'end', 
-                  gap: '12px', 
-                  padding: '12px', 
-                  border: '1px solid #d1d5db', 
-                  borderRadius: '8px', 
-                  backgroundColor: 'white' 
-                }}>
-                  <textarea
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleFormSubmit(e);
-                      }
-                    }}
-                    placeholder="Ask about weather, request radar images, or learn about weather patterns..."
-                    style={{
-                      flex: 1,
-                      resize: 'none',
-                      border: 'none',
-                      outline: 'none',
-                      backgroundColor: 'transparent',
-                      minHeight: '24px',
-                      maxHeight: '128px',
-                      fontFamily: 'inherit',
-                      fontSize: '14px'
-                    }}
-                    rows={1}
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="submit"
-                    disabled={isLoading || !inputMessage.trim()}
-                    style={{
-                      padding: '8px',
-                      backgroundColor: '#111827',
-                      color: 'white',
-                      borderRadius: '6px',
-                      border: 'none',
-                      cursor: isLoading || !inputMessage.trim() ? 'not-allowed' : 'pointer',
-                      opacity: isLoading || !inputMessage.trim() ? 0.5 : 1
-                    }}
-                  >
-                    {isLoading ? (
-                      <div style={{ 
-                        width: '16px', 
-                        height: '16px', 
-                        border: '2px solid white', 
-                        borderTop: '2px solid transparent', 
-                        borderRadius: '50%', 
-                        animation: 'spin 1s linear infinite' 
-                      }}></div>
-                    ) : (
-                      <span>→</span>
-                    )}
-                  </button>
-                </div>
-              </form>
-              
-              {/* Enhanced Suggestions with Educational Options */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-                {[
-                  "What's the weather like today?",
-                  "📡 Show me current radar",
-                  "📚 How do I read radar for tornadoes?",
-                  "🌪️ Explain tornado radar signatures",
-                  "🛰️ Show satellite imagery",
-                  "📊 Create forecast chart"
-                ].map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setInputMessage(suggestion)}
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: '14px',
-                      backgroundColor: '#f3f4f6',
-                      color: '#374151',
-                      borderRadius: '20px',
-                      border: '1px solid #e5e7eb',
-                      cursor: isLoading ? 'not-allowed' : 'pointer',
-                      opacity: isLoading ? 0.5 : 1
-                    }}
-                    disabled={isLoading}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-              
-              <p style={{ 
-                fontSize: '12px', 
-                color: '#6b7280', 
-                marginTop: '12px', 
-                textAlign: 'center', 
-                margin: '12px 0 0 0' 
-              }}>
-                WeatherGPT Educational • Real radar & satellite imagery • AI-powered weather learning
-              </p>
+              {/* External link if available */}
+              {currentImage.externalUrl && (
+                <a
+                  href={currentImage.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    fontSize: '14px', 
+                    color: '#2563eb', 
+                    textDecoration: 'none',
+                    marginTop: '8px'
+                  }}
+                >
+                  <ExternalLink style={{ width: '16px', height: '16px' }} />
+                  <span>View full size</span>
+                </a>
+              )}
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Thumbnail navigation for multiple images */}
+      {filteredImages.length > 1 && (
+        <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderTop: '1px solid #bfdbfe' }}>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
+            {filteredImages.map((image, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentImageIndex(index)}
+                style={{
+                  flexShrink: 0,
+                  width: '80px',
+                  height: '64px',
+                  borderRadius: '8px',
+                  border: `2px solid ${index === currentImageIndex ? '#2563eb' : '#d1d5db'}`,
+                  overflow: 'hidden',
+                  transition: 'all 0.2s',
+                  cursor: 'pointer',
+                  boxShadow: index === currentImageIndex ? '0 0 0 2px #bfdbfe' : 'none'
+                }}
+              >
+                <img
+                  src={image.url}
+                  alt={`Thumbnail ${index + 1}`}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.style.backgroundColor = '#e5e7eb';
+                  }}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Radar Image Component
+const RadarImageDisplay = ({ radarImages, location }) => {
+  const [currentRadar, setCurrentRadar] = useState(0);
+
+  if (!radarImages || radarImages.length === 0) return null;
+
+  return (
+    <div style={{ 
+      marginTop: '16px', 
+      backgroundColor: 'white', 
+      borderRadius: '12px', 
+      border: '1px solid #e5e7eb', 
+      overflow: 'hidden' 
+    }}>
+      <div style={{ 
+        background: 'linear-gradient(to right, #059669, #2563eb)', 
+        color: 'white', 
+        padding: '12px' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ 
+              width: '8px', 
+              height: '8px', 
+              backgroundColor: '#10b981', 
+              borderRadius: '50%', 
+              animation: 'pulse 1.5s ease-in-out infinite' 
+            }}></div>
+            <h3 style={{ fontWeight: '600', margin: 0 }}>Live Radar</h3>
+            {location && (
+              <span style={{ fontSize: '12px', opacity: 0.9 }}>
+                {location.name || `${location.lat?.toFixed(2)}, ${location.lon?.toFixed(2)}`}
+              </span>
+            )}
+          </div>
+          {radarImages.length > 1 && (
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {radarImages.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentRadar(index)}
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    backgroundColor: index === currentRadar ? 'white' : 'rgba(255,255,255,0.5)'
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <style jsx>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-    </>
+      <div style={{ 
+        aspectRatio: '1/1', 
+        backgroundColor: '#f3f4f6', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        position: 'relative' 
+      }}>
+        {radarImages[currentRadar] && (
+          <img
+            src={radarImages[currentRadar].url}
+            alt={radarImages[currentRadar].description}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'flex';
+            }}
+          />
+        )}
+        <div style={{ 
+          position: 'absolute', 
+          inset: 0, 
+          backgroundColor: '#e5e7eb', 
+          display: 'none', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          color: '#6b7280',
+          flexDirection: 'column'
+        }}>
+          <Eye style={{ width: '32px', height: '32px', marginBottom: '8px', opacity: 0.5 }} />
+          <p style={{ fontSize: '14px', margin: 0 }}>Radar unavailable</p>
+        </div>
+      </div>
+
+      <div style={{ padding: '12px', backgroundColor: '#f9fafb', fontSize: '14px', color: '#6b7280' }}>
+        <p style={{ margin: '0 0 4px 0' }}>{radarImages[currentRadar]?.description}</p>
+        <p style={{ fontSize: '12px', margin: 0 }}>
+          Source: {radarImages[currentRadar]?.source}
+          {radarImages[currentRadar]?.station && ` • Station: ${radarImages[currentRadar].station}`}
+        </p>
+      </div>
+    </div>
   );
-}
+};
 
-// Helper function for weather emojis (keep your existing function)
-function getWeatherEmoji(condition) {
-  const emojiMap = {
-    'Clear': '☀️',
-    'Clouds': '☁️',
-    'Rain': '🌧️',
-    'Drizzle': '🌦️',
-    'Thunderstorm': '⛈️',
-    'Snow': '🌨️',
-    'Mist': '🌫️',
-    'Fog': '🌫️',
-    'Haze': '🌫️'
+// Helper functions
+function getCategoryLabel(category) {
+  const labels = {
+    educational: 'Educational',
+    radar: 'Radar',
+    satellite: 'Satellite',
+    fieldPhotos: 'Photos',
+    diagrams: 'Diagrams',
+    weatherScene: 'AI Scene',
+    forecastChart: 'Forecast'
   };
-  return emojiMap[condition] || '🌤️';
+  return labels[category] || category;
 }
 
-// Keep all your other existing functions (sendMessage, clearChat, etc.)
+function formatTopicName(topic) {
+  const names = {
+    tornado: 'Tornadoes',
+    hurricane: 'Hurricanes',
+    radar_reading: 'Radar Reading',
+    thunderstorm: 'Thunderstorms',
+    winter_weather: 'Winter Weather',
+    general: 'Weather Education'
+  };
+  return names[topic] || topic.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function getImageTypeIcon(type) {
+  const icons = {
+    radar_reflectivity: '📡',
+    radar_current: '📡',
+    satellite_visible: '🛰️',
+    satellite_infrared: '🛰️',
+    educational: '📚',
+    field_photo: '📸',
+    diagram: '📊',
+    weatherScene: '🎨',
+    forecastChart: '📈'
+  };
+  return icons[type] || '🌤️';
+}
+
+function getEducationalExplanation(image, topic) {
+  const explanations = {
+    tornado: {
+      hook_echo: "This hook echo pattern on radar indicates rotation in a thunderstorm and possible tornado formation. The 'hook' shape shows where precipitation is being pulled around the mesocyclone.",
+      velocity_couplet: "This velocity radar image shows winds moving toward and away from the radar in close proximity, indicating rotation that could produce a tornado.",
+      debris_ball: "The circular area of high reflectivity near the hook echo indicates debris being lofted by a tornado, confirming tornado occurrence."
+    },
+    radar_reading: {
+      reflectivity: "Radar reflectivity shows precipitation intensity. Green indicates light rain, yellow/orange shows moderate to heavy rain, and red indicates very heavy precipitation or hail.",
+      velocity: "Velocity radar shows wind movement. Green areas show winds moving toward the radar, red shows winds moving away. Adjacent areas of different colors indicate rotation.",
+      correlation_coefficient: "This product helps distinguish between precipitation types and can identify debris signatures during tornadoes."
+    },
+    hurricane: {
+      eye: "The clear center of the hurricane where winds are calm and skies are often clear. The eye forms due to the balance between centrifugal force and pressure gradient.",
+      eyewall: "The ring of intense thunderstorms around the eye where the strongest winds occur. This is the most dangerous part of the hurricane.",
+      rainbands: "Spiral bands of thunderstorms that extend outward from the eyewall, producing heavy rain and gusty winds."
+    }
+  };
+
+  // Try to match image description or type to explanation
+  if (explanations[topic]) {
+    for (const [key, explanation] of Object.entries(explanations[topic])) {
+      if (image.description?.toLowerCase().includes(key) || image.type?.includes(key)) {
+        return explanation;
+      }
+    }
+  }
+
+  // Default educational explanation
+  return `This ${getCategoryLabel(image.category).toLowerCase()} helps illustrate weather patterns and phenomena for educational purposes.`;
+}
+
+// Export components properly
+export { EducationalImageGallery, RadarImageDisplay };
+export default { EducationalImageGallery, RadarImageDisplay };

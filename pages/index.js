@@ -1,10 +1,9 @@
-// pages/index.js - Integration example for educational images
+// pages/index.js - Fixed version with all required functions
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { EducationalImageGallery, RadarImageDisplay } from '../components/EducationalWeatherImages';
 
 export default function Home() {
-  // ... (keep all your existing state and functions)
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -18,7 +17,128 @@ export default function Home() {
   const [locationError, setLocationError] = useState('');
   const messagesEndRef = useRef(null);
 
-  // ... (keep all your existing useEffect hooks and functions)
+  // Auto-scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Get user location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation({
+            lat: position.coords.latitude,
+            lon: position.coords.longitude
+          });
+          setLocationError('');
+        },
+        (error) => {
+          console.error('Location error:', error);
+          setLocationError('Location access denied. Weather data may be limited.');
+        }
+      );
+    } else {
+      setLocationError('Geolocation not supported by this browser.');
+    }
+  }, []);
+
+  // Clear chat function
+  const clearChat = () => {
+    setMessages([{
+      role: 'assistant',
+      content: 'Hello! I\'m your AI weather assistant. Ask me about current conditions, forecasts, or request visual weather images! I can also help you learn about weather patterns with real radar and satellite imagery.',
+      timestamp: new Date()
+    }]);
+  };
+
+  // Send message function
+  const sendMessage = async (messageText = null, includeImages = true) => {
+    const textToSend = messageText || inputMessage.trim();
+    if (!textToSend || isLoading) return;
+
+    const userMessage = {
+      role: 'user',
+      content: textToSend,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    if (!messageText) setInputMessage('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: textToSend,
+          location: location,
+          conversationHistory: messages.slice(-6).map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          includeImages: includeImages
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const assistantMessage = {
+          role: 'assistant',
+          content: data.response,
+          timestamp: new Date(),
+          weatherData: data.weatherData,
+          images: data.images,
+          hasImages: data.hasImages,
+          isEducational: data.isEducational,
+          educationalTopic: data.educationalTopic
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      } else {
+        throw new Error(data.error || 'Failed to get response');
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage = {
+        role: 'assistant',
+        content: 'I apologize, but I\'m experiencing technical difficulties. Please try again in a moment.',
+        timestamp: new Date(),
+        isError: true
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    sendMessage();
+  };
+
+  // Helper function for weather emojis
+  const getWeatherEmoji = (condition) => {
+    const emojiMap = {
+      'Clear': '☀️',
+      'Clouds': '☁️',
+      'Rain': '🌧️',
+      'Drizzle': '🌦️',
+      'Thunderstorm': '⛈️',
+      'Snow': '🌨️',
+      'Mist': '🌫️',
+      'Fog': '🌫️',
+      'Haze': '🌫️'
+    };
+    return emojiMap[condition] || '🌤️';
+  };
 
   // Enhanced Weather Card Component with Educational Images
   const EnhancedWeatherCard = ({ weatherData, images, isEducational, educationalTopic }) => {
@@ -251,8 +371,6 @@ export default function Home() {
       </div>
     </div>
   );
-
-  // ... (keep all your existing helper functions like getWeatherEmoji, etc.)
 
   return (
     <>
@@ -614,21 +732,3 @@ export default function Home() {
     </>
   );
 }
-
-// Helper function for weather emojis (keep your existing function)
-function getWeatherEmoji(condition) {
-  const emojiMap = {
-    'Clear': '☀️',
-    'Clouds': '☁️',
-    'Rain': '🌧️',
-    'Drizzle': '🌦️',
-    'Thunderstorm': '⛈️',
-    'Snow': '🌨️',
-    'Mist': '🌫️',
-    'Fog': '🌫️',
-    'Haze': '🌫️'
-  };
-  return emojiMap[condition] || '🌤️';
-}
-
-// Keep all your other existing functions (sendMessage, clearChat, etc.)
