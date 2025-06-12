@@ -108,23 +108,21 @@ export default function Home() {
     const temp = Math.round(weatherData.current.main?.temp || 0);
     const description = weatherData.current.weather?.[0]?.description || '';
     const locationName = weatherData.current.name || '';
-    const humidity = weatherData.current.main?.humidity || 0;
-    const windSpeed = Math.round(weatherData.current.wind?.speed || 0);
 
     return (
-      <div className="mt-3 p-4 border border-gray-200 rounded-lg bg-gray-50">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-3xl">🌤️</div>
-            <div>
-              <div className="font-semibold text-gray-900">{locationName}</div>
-              <div className="text-2xl font-bold text-gray-900">{temp}°F</div>
-              <div className="text-gray-600 capitalize">{description}</div>
-            </div>
-          </div>
-          <div className="text-right text-sm text-gray-600">
-            <div>Humidity: {humidity}%</div>
-            <div>Wind: {windSpeed} mph</div>
+      <div style={{ 
+        marginTop: '12px', 
+        padding: '16px', 
+        border: '1px solid #e5e7eb', 
+        borderRadius: '8px', 
+        backgroundColor: '#f9fafb'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ fontSize: '24px' }}>🌤️</div>
+          <div>
+            <div style={{ fontWeight: '600', color: '#111827' }}>{locationName}</div>
+            <div style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>{temp}°F</div>
+            <div style={{ color: '#6b7280', textTransform: 'capitalize' }}>{description}</div>
           </div>
         </div>
       </div>
@@ -148,41 +146,92 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="flex h-screen bg-gray-50">
+      <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f9fafb' }}>
         {/* Sidebar */}
-        <div className="w-64 bg-gray-900 text-white flex flex-col">
+        <div style={{ 
+          width: '260px', 
+          backgroundColor: '#111827', 
+          color: 'white', 
+          display: 'flex', 
+          flexDirection: 'column' 
+        }}>
           {/* Header */}
-          <div className="p-4 border-b border-gray-700">
+          <div style={{ padding: '16px', borderBottom: '1px solid #374151' }}>
             <button
               onClick={clearChat}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-800 transition-colors"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px',
+                borderRadius: '6px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: 'white',
+                cursor: 'pointer'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#374151'}
+              onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <span style={{ fontSize: '16px' }}>+</span>
               New chat
             </button>
           </div>
 
-          {/* Chat history placeholder */}
-          <div className="flex-1 p-4">
-            <div className="text-xs text-gray-400 mb-2">Previous conversations</div>
-            <div className="space-y-2">
-              <div className="text-sm text-gray-300 p-2 rounded hover:bg-gray-800 cursor-pointer">Today's weather forecast</div>
-              <div className="text-sm text-gray-300 p-2 rounded hover:bg-gray-800 cursor-pointer">Weekend plans check</div>
-              <div className="text-sm text-gray-300 p-2 rounded hover:bg-gray-800 cursor-pointer">Storm warning alerts</div>
+          {/* Chat history */}
+          <div style={{ flex: 1, padding: '16px' }}>
+            <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>
+              Previous conversations
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ 
+                fontSize: '14px', 
+                color: '#d1d5db', 
+                padding: '8px', 
+                borderRadius: '4px', 
+                cursor: 'pointer' 
+              }}>
+                Today's weather forecast
+              </div>
+              <div style={{ 
+                fontSize: '14px', 
+                color: '#d1d5db', 
+                padding: '8px', 
+                borderRadius: '4px', 
+                cursor: 'pointer' 
+              }}>
+                Weekend plans check
+              </div>
+              <div style={{ 
+                fontSize: '14px', 
+                color: '#d1d5db', 
+                padding: '8px', 
+                borderRadius: '4px', 
+                cursor: 'pointer' 
+              }}>
+                Storm warning alerts
+              </div>
             </div>
           </div>
 
           {/* User info */}
-          <div className="p-4 border-t border-gray-700">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium">U</span>
+          <div style={{ padding: '16px', borderTop: '1px solid #374151' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ 
+                width: '32px', 
+                height: '32px', 
+                backgroundColor: '#3b82f6', 
+                borderRadius: '50%', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}>
+                <span style={{ fontSize: '14px', fontWeight: '500' }}>U</span>
               </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium">Weather User</div>
-                <div className="text-xs text-gray-400">
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '14px', fontWeight: '500' }}>Weather User</div>
+                <div style={{ fontSize: '12px', color: '#9ca3af' }}>
                   {location ? '📍 Location detected' : 'Getting location...'}
                 </div>
               </div>
@@ -191,56 +240,80 @@ export default function Home() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col">
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           {/* Top bar */}
-          <div className="bg-white border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                  </svg>
+          <div style={{ 
+            backgroundColor: 'white', 
+            borderBottom: '1px solid #e5e7eb', 
+            padding: '16px 24px' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  backgroundColor: '#10b981', 
+                  borderRadius: '50%', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center' 
+                }}>
+                  <span style={{ color: 'white', fontSize: '16px' }}>⚡</span>
                 </div>
                 <div>
-                  <h1 className="text-lg font-semibold text-gray-900">WeatherGPT</h1>
-                  <p className="text-sm text-gray-500">AI Weather Assistant</p>
+                  <h1 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', margin: 0 }}>
+                    WeatherGPT
+                  </h1>
+                  <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
+                    AI Weather Assistant
+                  </p>
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                <div className="text-sm text-gray-500">
-                  {location ? '📍 Location enabled' : locationError}
-                </div>
+              <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                {location ? '📍 Location enabled' : locationError}
               </div>
             </div>
           </div>
 
           {/* Messages area */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-6 py-6">
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ maxWidth: '768px', margin: '0 auto', padding: '24px' }}>
               {messages.map((message, index) => (
-                <div key={index} className={`mb-6 flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                <div 
+                  key={index} 
+                  style={{ 
+                    marginBottom: '24px', 
+                    display: 'flex', 
+                    gap: '16px',
+                    flexDirection: message.role === 'user' ? 'row-reverse' : 'row'
+                  }}
+                >
                   {/* Avatar */}
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    message.role === 'user' 
-                      ? 'bg-blue-600' 
-                      : 'bg-green-600'
-                  }`}>
+                  <div style={{ 
+                    width: '32px', 
+                    height: '32px', 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    flexShrink: 0,
+                    backgroundColor: message.role === 'user' ? '#3b82f6' : '#10b981'
+                  }}>
                     {message.role === 'user' ? (
-                      <span className="text-white text-sm font-medium">U</span>
+                      <span style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>U</span>
                     ) : (
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                      </svg>
+                      <span style={{ color: 'white', fontSize: '14px' }}>⚡</span>
                     )}
                   </div>
 
                   {/* Message content */}
-                  <div className="flex-1 max-w-none">
-                    <div className={`prose prose-slate max-w-none ${
-                      message.isError ? 'text-red-600' : 'text-gray-900'
-                    }`}>
-                      <div className="whitespace-pre-wrap leading-relaxed">
+                  <div style={{ flex: 1, maxWidth: 'none' }}>
+                    <div style={{ 
+                      color: message.isError ? '#dc2626' : '#111827',
+                      lineHeight: '1.6'
+                    }}>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>
                         {message.content}
                       </div>
                       
@@ -254,18 +327,44 @@ export default function Home() {
 
               {/* Loading indicator */}
               {isLoading && (
-                <div className="mb-6 flex gap-4">
-                  <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                    </svg>
+                <div style={{ marginBottom: '24px', display: 'flex', gap: '16px' }}>
+                  <div style={{ 
+                    width: '32px', 
+                    height: '32px', 
+                    backgroundColor: '#10b981', 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center' 
+                  }}>
+                    <span style={{ color: 'white', fontSize: '14px' }}>⚡</span>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-1 text-gray-500">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                      <span className="ml-2">WeatherGPT is thinking...</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#6b7280' }}>
+                      <div style={{ 
+                        width: '8px', 
+                        height: '8px', 
+                        backgroundColor: '#9ca3af', 
+                        borderRadius: '50%', 
+                        animation: 'pulse 1.5s ease-in-out infinite' 
+                      }}></div>
+                      <div style={{ 
+                        width: '8px', 
+                        height: '8px', 
+                        backgroundColor: '#9ca3af', 
+                        borderRadius: '50%', 
+                        animation: 'pulse 1.5s ease-in-out infinite',
+                        animationDelay: '0.2s'
+                      }}></div>
+                      <div style={{ 
+                        width: '8px', 
+                        height: '8px', 
+                        backgroundColor: '#9ca3af', 
+                        borderRadius: '50%', 
+                        animation: 'pulse 1.5s ease-in-out infinite',
+                        animationDelay: '0.4s'
+                      }}></div>
+                      <span style={{ marginLeft: '8px' }}>WeatherGPT is thinking...</span>
                     </div>
                   </div>
                 </div>
@@ -276,10 +375,22 @@ export default function Home() {
           </div>
 
           {/* Input area */}
-          <div className="bg-white border-t border-gray-200 px-6 py-4">
-            <div className="max-w-3xl mx-auto">
-              <form onSubmit={sendMessage} className="relative">
-                <div className="flex items-end gap-3 p-3 border border-gray-300 rounded-lg bg-white focus-within:border-gray-400 transition-colors">
+          <div style={{ 
+            backgroundColor: 'white', 
+            borderTop: '1px solid #e5e7eb', 
+            padding: '16px 24px' 
+          }}>
+            <div style={{ maxWidth: '768px', margin: '0 auto' }}>
+              <form onSubmit={sendMessage}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'end', 
+                  gap: '12px', 
+                  padding: '12px', 
+                  border: '1px solid #d1d5db', 
+                  borderRadius: '8px', 
+                  backgroundColor: 'white' 
+                }}>
                   <textarea
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
@@ -290,36 +401,51 @@ export default function Home() {
                       }
                     }}
                     placeholder="Ask about weather conditions, forecasts, or anything weather-related..."
-                    className="flex-1 resize-none border-none outline-none bg-transparent min-h-[24px] max-h-32"
+                    style={{
+                      flex: 1,
+                      resize: 'none',
+                      border: 'none',
+                      outline: 'none',
+                      backgroundColor: 'transparent',
+                      minHeight: '24px',
+                      maxHeight: '128px',
+                      fontFamily: 'inherit',
+                      fontSize: '14px'
+                    }}
                     rows={1}
                     disabled={isLoading}
-                    style={{
-                      height: 'auto',
-                      minHeight: '24px'
-                    }}
-                    onInput={(e) => {
-                      e.target.style.height = 'auto';
-                      e.target.style.height = Math.min(e.target.scrollHeight, 128) + 'px';
-                    }}
                   />
                   <button
                     type="submit"
                     disabled={isLoading || !inputMessage.trim()}
-                    className="p-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    style={{
+                      padding: '8px',
+                      backgroundColor: '#111827',
+                      color: 'white',
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: isLoading || !inputMessage.trim() ? 'not-allowed' : 'pointer',
+                      opacity: isLoading || !inputMessage.trim() ? 0.5 : 1
+                    }}
                   >
                     {isLoading ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div style={{ 
+                        width: '16px', 
+                        height: '16px', 
+                        border: '2px solid white', 
+                        borderTop: '2px solid transparent', 
+                        borderRadius: '50%', 
+                        animation: 'spin 1s linear infinite' 
+                      }}></div>
                     ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
+                      <span>→</span>
                     )}
                   </button>
                 </div>
               </form>
               
               {/* Suggestions */}
-              <div className="flex flex-wrap gap-2 mt-3">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
                 {[
                   "What's the weather like today?",
                   "Will it rain tomorrow?",
@@ -329,7 +455,16 @@ export default function Home() {
                   <button
                     key={index}
                     onClick={() => setInputMessage(suggestion)}
-                    className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors border border-gray-200"
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '14px',
+                      backgroundColor: '#f3f4f6',
+                      color: '#374151',
+                      borderRadius: '20px',
+                      border: '1px solid #e5e7eb',
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      opacity: isLoading ? 0.5 : 1
+                    }}
                     disabled={isLoading}
                   >
                     {suggestion}
@@ -337,13 +472,30 @@ export default function Home() {
                 ))}
               </div>
               
-              <p className="text-xs text-gray-500 mt-3 text-center">
+              <p style={{ 
+                fontSize: '12px', 
+                color: '#6b7280', 
+                marginTop: '12px', 
+                textAlign: 'center', 
+                margin: '12px 0 0 0' 
+              }}>
                 WeatherGPT can make mistakes. Verify important weather information with official sources.
               </p>
             </div>
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </>
   );
 }
