@@ -1,5 +1,4 @@
 import { generateWeatherResponse } from '../../lib/openai';
-import { generateWeatherResponse } from '../../lib/openai';
 import { getCurrentWeather, getWeatherForecast } from '../../lib/weather';
 
 export default async function handler(req, res) {
