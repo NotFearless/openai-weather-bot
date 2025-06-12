@@ -1,4 +1,4 @@
-// pages/index.js - Fixed version with all required functions
+// pages/index.js - Fixed version without empty stats box
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { EducationalImageGallery, RadarImageDisplay } from '../components/EducationalWeatherImages';
@@ -140,125 +140,6 @@ export default function Home() {
     return emojiMap[condition] || '🌤️';
   };
 
-  // Enhanced Weather Card Component with Educational Images
-  const EnhancedWeatherCard = ({ weatherData, images, isEducational, educationalTopic }) => {
-    if (!weatherData?.current) return null;
-
-    const temp = Math.round(weatherData.current.main?.temp || 0);
-    const description = weatherData.current.weather?.[0]?.description || '';
-    const locationName = weatherData.current.name || '';
-    const humidity = weatherData.current.main?.humidity || 0;
-    const windSpeed = Math.round(weatherData.current.wind?.speed || 0);
-    const feelsLike = Math.round(weatherData.current.main?.feels_like || 0);
-
-    return (
-      <div style={{ 
-        marginTop: '16px', 
-        border: '1px solid #e5e7eb', 
-        borderRadius: '12px', 
-        backgroundColor: 'white',
-        overflow: 'hidden',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-      }}>
-        {/* Weather Scene Image */}
-        {images?.weatherScene?.success && (
-          <div style={{ position: 'relative', height: '200px', overflow: 'hidden' }}>
-            <img 
-              src={images.weatherScene.imageUrl}
-              alt={`Weather scene showing ${description}`}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover'
-              }}
-            />
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.1))'
-            }} />
-            <div style={{
-              position: 'absolute',
-              top: '16px',
-              left: '16px',
-              color: 'white',
-              textShadow: '0 2px 4px rgba(0,0,0,0.5)'
-            }}>
-              <div style={{ fontSize: '24px', fontWeight: '700' }}>{temp}°F</div>
-              <div style={{ fontSize: '14px', opacity: 0.9 }}>Feels like {feelsLike}°F</div>
-            </div>
-          </div>
-        )}
-
-        {/* Weather Details */}
-        <div style={{ padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <div>
-              <div style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>
-                {locationName}
-              </div>
-              <div style={{ fontSize: '14px', color: '#6b7280', textTransform: 'capitalize' }}>
-                {description}
-              </div>
-            </div>
-            {!images?.weatherScene?.success && (
-              <div style={{ fontSize: '48px' }}>
-                {getWeatherEmoji(weatherData.current.weather?.[0]?.main)}
-              </div>
-            )}
-          </div>
-
-          {/* Weather Stats Grid */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(3, 1fr)', 
-            gap: '12px',
-            padding: '12px',
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px'
-          }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>Humidity</div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>{humidity}%</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>Wind</div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>{windSpeed} mph</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>Feels Like</div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>{feelsLike}°F</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Educational Images Gallery */}
-        {(isEducational || Object.keys(images || {}).length > 0) && (
-          <div style={{ borderTop: '1px solid #e5e7eb' }}>
-            <EducationalImageGallery 
-              images={images} 
-              topic={educationalTopic}
-              isEducational={isEducational}
-            />
-          </div>
-        )}
-
-        {/* Radar Display for radar-specific queries */}
-        {images?.radar && images.radar.length > 0 && (
-          <div style={{ borderTop: '1px solid #e5e7eb' }}>
-            <RadarImageDisplay 
-              radarImages={images.radar} 
-              location={location}
-            />
-          </div>
-        )}
-      </div>
-    );
-  };
-
   // Updated Weather Image Request Buttons with Educational Options
   const WeatherImageButtons = ({ onImageRequest }) => {
     const buttons = [
@@ -344,17 +225,49 @@ export default function Home() {
             {message.content}
           </div>
           
-          {/* Enhanced Weather Card with Educational Support */}
-          {message.weatherData && (
-            <EnhancedWeatherCard 
-              weatherData={message.weatherData} 
-              images={message.images || {}}
-              isEducational={message.isEducational}
-              educationalTopic={message.educationalTopic}
-            />
+          {/* Simple Image Display Only - NO STATS BOX */}
+          {message.images && Object.keys(message.images).length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              {/* Weather Scene Image */}
+              {message.images.weatherScene?.success && (
+                <div style={{ 
+                  marginBottom: '16px',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}>
+                  <img 
+                    src={message.images.weatherScene.imageUrl}
+                    alt="AI generated weather scene"
+                    style={{
+                      width: '100%',
+                      height: '200px',
+                      objectFit: 'cover'
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Educational Images */}
+              {message.isEducational && (
+                <EducationalImageGallery 
+                  images={message.images}
+                  topic={message.educationalTopic}
+                  isEducational={true}
+                />
+              )}
+
+              {/* Radar Images */}
+              {message.images.radar && message.images.radar.length > 0 && (
+                <RadarImageDisplay 
+                  radarImages={message.images.radar} 
+                  location={location}
+                />
+              )}
+            </div>
           )}
 
-          {/* Standalone Educational Images */}
+          {/* Standalone Educational Images (when no weather data) */}
           {message.isEducational && message.images && !message.weatherData && (
             <EducationalImageGallery 
               images={message.images}
