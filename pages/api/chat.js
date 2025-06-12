@@ -1,4 +1,4 @@
-// pages/api/chat.js - Complete full-featured version
+// pages/api/chat.js - Complete full file with all location switching fixes
 import { generateWeatherResponse, generateEnhancedWeatherResponse } from '../../lib/openai';
 import { getCurrentWeather, getWeatherForecast, getNWSAlerts, getCompleteWeatherData, searchLocation, extractLocationFromMessage } from '../../lib/weather';
 import { generateEducationalWeatherResponse } from '../../lib/weatherEducation';
@@ -39,12 +39,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    console.log('Processing message:', message);
+    console.log('🔄 Processing message:', message);
+    console.log('📍 User location:', location ? `${location.lat}, ${location.lon}` : 'Not available');
 
-    // Initialize response data
+    // Initialize response data - CLEAR PREVIOUS STATE COMPLETELY
     let weatherData = null;
     let locationData = null;
     let searchedLocation = null;
+    let usedUserLocation = false;
     let educationalResponse = null;
 
     // Step 1: Check if this is an educational weather query FIRST
@@ -56,141 +58,210 @@ export default async function handler(req, res) {
           conversationHistory, 
           location
         );
-        console.log('Educational response:', educationalResponse?.isEducational);
+        console.log('📚 Educational response:', educationalResponse?.isEducational);
       }
     } catch (error) {
-      console.error('Educational response error:', error);
+      console.error('❌ Educational response error:', error);
       // Continue processing even if educational fails
     }
 
-    // Step 2: Check if user is asking about a specific location
+    // Step 2: ALWAYS check for location in message FIRST (highest priority)
     const locationFromMessage = extractLocationFromMessage(message);
     
     if (locationFromMessage) {
-      console.log(`Extracted location from message: ${locationFromMessage}`);
+      console.log('🎯 Location extracted from message:', locationFromMessage);
       
       try {
-        // Search for the mentioned location
+        // Search for the mentioned location - FORCE FRESH SEARCH
         const searchResult = await searchLocation(locationFromMessage);
         if (searchResult.success && searchResult.data.length > 0) {
           locationData = searchResult.data[0]; // Use the best match
           searchedLocation = locationFromMessage;
-          console.log(`Found location: ${locationData.displayName}`);
+          console.log('✅ Found specific location:', locationData.displayName);
+          console.log('📐 Coordinates:', `${locationData.lat}, ${locationData.lon}`);
         } else {
-          console.log(`Could not find location: ${locationFromMessage}`);
+          console.log('❌ Could not find location:', locationFromMessage);
+          // Return helpful error for invalid location search
+          return res.status(200).json({
+            response: `I couldn't find a location called "${locationFromMessage}". Could you try a different city name or be more specific? For example: "New York, NY" or "London, UK".`,
+            weatherData: { 
+              error: `Location "${locationFromMessage}" not found`,
+              searchedLocation: locationFromMessage,
+              needsLocation: true
+            },
+            images: {},
+            hasImages: false,
+            isEducational: false,
+            educationalTopic: null,
+            locationFound: null,
+            searchedFor: locationFromMessage,
+            usage: null
+          });
         }
       } catch (error) {
-        console.error('Location search error:', error);
-        // Continue with user's current location
+        console.error('❌ Location search error:', error);
+        return res.status(200).json({
+          response: `I had trouble searching for "${locationFromMessage}". Please try again or check the spelling. You can also try being more specific, like "Paris, France" instead of just "Paris".`,
+          weatherData: { 
+            error: 'Location search failed',
+            searchedLocation: locationFromMessage,
+            debugInfo: error.message
+          },
+          images: {},
+          hasImages: false,
+          isEducational: false,
+          educationalTopic: null,
+          locationFound: null,
+          searchedFor: locationFromMessage,
+          usage: null
+        });
+      }
+    } else {
+      // Step 3: No location in message, use user's current location if available
+      if (location?.lat && location?.lon) {
+        usedUserLocation = true;
+        console.log('📍 Using user current location:', `${location.lat}, ${location.lon}`);
+      } else {
+        console.log('❌ No location available (message or GPS)');
       }
     }
 
-    // Step 3: Use the found location or fallback to user's current location
+    // Step 4: Determine final target location - CLEAR PRIORITY SYSTEM
     const targetLocation = locationData || location;
+    const locationSource = locationData ? 'searched' : (usedUserLocation ? 'gps' : 'none');
+    
+    console.log('🎯 Final target location:', targetLocation ? `${targetLocation.lat}, ${targetLocation.lon}` : 'None');
+    console.log('📂 Location source:', locationSource);
 
-    // Step 4: Determine what weather data we need based on the query
-    const needsWeatherData = /\b(weather|temperature|temp|rain|snow|wind|humidity|forecast|alert|warning|storm|cloudy|sunny|conditions)\b/i.test(message);
+    // Step 5: Determine what weather data we need based on the query
+    const needsWeatherData = /\b(weather|temperature|temp|rain|snow|wind|humidity|forecast|alert|warning|storm|cloudy|sunny|conditions|hot|cold|warm|cool)\b/i.test(message);
     
     if (needsWeatherData && targetLocation?.lat && targetLocation?.lon) {
-      console.log('Fetching weather data for:', targetLocation);
+      console.log('🌤️ Weather data requested, fetching for:', targetLocation);
       
       try {
         // Check what type of data the user is asking for
         const needsAlerts = /\b(watch|warning|alert|advisory|severe|storm|tornado|hurricane|flood|emergency)\b/i.test(message);
-        const needsForecast = /\b(forecast|tomorrow|week|days|upcoming|future)\b/i.test(message);
-        const needsCurrent = /\b(now|current|today|right now|currently)\b/i.test(message) || (!needsAlerts && !needsForecast);
+        const needsForecast = /\b(forecast|tomorrow|week|days|upcoming|future|tonight|morning)\b/i.test(message);
+        const needsCurrent = /\b(now|current|today|right now|currently|this moment)\b/i.test(message) || (!needsAlerts && !needsForecast);
 
-        console.log(`Data needs - Alerts: ${needsAlerts}, Forecast: ${needsForecast}, Current: ${needsCurrent}`);
+        console.log(`📊 Data needs - Alerts: ${needsAlerts}, Forecast: ${needsForecast}, Current: ${needsCurrent}`);
 
-        // Fetch appropriate weather data
+        // FRESH FETCH - Don't use any cached data from previous requests
         if (needsAlerts) {
-          console.log('Fetching weather data with alerts...');
+          console.log('🚨 Fetching weather data with alerts...');
           const completeData = await getCompleteWeatherData(targetLocation.lat, targetLocation.lon, true);
           if (completeData.success) {
             weatherData = {
               ...completeData.data,
               requestType: 'alerts',
               searchedLocation: searchedLocation,
-              locationUsed: locationData ? locationData.displayName : 'current location'
+              locationUsed: locationData ? locationData.displayName : 'your current location',
+              coordinates: { lat: targetLocation.lat, lon: targetLocation.lon },
+              locationSource: locationSource
             };
-            console.log('Weather data with alerts fetched successfully');
+            console.log('✅ Weather data with alerts fetched successfully');
+          } else {
+            throw new Error(completeData.error || 'Failed to fetch weather with alerts');
           }
         } else if (needsForecast && needsCurrent) {
-          console.log('Fetching current and forecast data...');
-          const [currentWeather, forecast] = await Promise.all([
+          console.log('📈 Fetching current and forecast data...');
+          const [currentWeather, forecast] = await Promise.allSettled([
             getCurrentWeather(targetLocation.lat, targetLocation.lon),
             getWeatherForecast(targetLocation.lat, targetLocation.lon)
           ]);
 
           weatherData = {
-            current: currentWeather.success ? currentWeather.data : null,
-            forecast: forecast.success ? forecast.data : null,
+            current: currentWeather.status === 'fulfilled' && currentWeather.value.success ? currentWeather.value.data : null,
+            forecast: forecast.status === 'fulfilled' && forecast.value.success ? forecast.value.data : null,
             requestType: 'current+forecast',
             searchedLocation: searchedLocation,
-            locationUsed: locationData ? locationData.displayName : 'current location'
+            locationUsed: locationData ? locationData.displayName : 'your current location',
+            coordinates: { lat: targetLocation.lat, lon: targetLocation.lon },
+            locationSource: locationSource
           };
-          console.log('Current and forecast data fetched successfully');
+          console.log('✅ Current and forecast data fetched');
         } else if (needsForecast) {
-          console.log('Fetching forecast data...');
+          console.log('📈 Fetching forecast data...');
           const forecast = await getWeatherForecast(targetLocation.lat, targetLocation.lon);
-          weatherData = {
-            forecast: forecast.success ? forecast.data : null,
-            requestType: 'forecast',
-            searchedLocation: searchedLocation,
-            locationUsed: locationData ? locationData.displayName : 'current location'
-          };
-          console.log('Forecast data fetched successfully');
+          if (forecast.success) {
+            weatherData = {
+              forecast: forecast.data,
+              requestType: 'forecast',
+              searchedLocation: searchedLocation,
+              locationUsed: locationData ? locationData.displayName : 'your current location',
+              coordinates: { lat: targetLocation.lat, lon: targetLocation.lon },
+              locationSource: locationSource
+            };
+            console.log('✅ Forecast data fetched successfully');
+          } else {
+            throw new Error(forecast.error || 'Failed to fetch forecast');
+          }
         } else {
-          console.log('Fetching current weather data...');
+          console.log('🌡️ Fetching current weather data...');
           const currentWeather = await getCurrentWeather(targetLocation.lat, targetLocation.lon);
-          weatherData = {
-            current: currentWeather.success ? currentWeather.data : null,
-            requestType: 'current',
-            searchedLocation: searchedLocation,
-            locationUsed: locationData ? locationData.displayName : 'current location'
-          };
-          console.log('Current weather data fetched successfully');
+          if (currentWeather.success) {
+            weatherData = {
+              current: currentWeather.data,
+              requestType: 'current',
+              searchedLocation: searchedLocation,
+              locationUsed: locationData ? locationData.displayName : 'your current location',
+              coordinates: { lat: targetLocation.lat, lon: targetLocation.lon },
+              locationSource: locationSource
+            };
+            console.log('✅ Current weather data fetched successfully');
+          } else {
+            throw new Error(currentWeather.error || 'Failed to fetch current weather');
+          }
         }
       } catch (weatherError) {
-        console.error('Weather API failed:', weatherError.message);
+        console.error('❌ Weather API failed:', weatherError.message);
         weatherData = {
-          error: 'Weather data temporarily unavailable',
+          error: 'Weather data temporarily unavailable - please try again in a moment',
           searchedLocation: searchedLocation,
-          locationUsed: locationData ? locationData.displayName : 'current location'
+          locationUsed: locationData ? locationData.displayName : 'your current location',
+          coordinates: targetLocation ? { lat: targetLocation.lat, lon: targetLocation.lon } : null,
+          debugInfo: weatherError.message,
+          locationSource: locationSource
         };
       }
     } else if (needsWeatherData && !targetLocation) {
-      console.log('Weather requested but no location available');
+      console.log('❌ Weather requested but no location available');
       weatherData = {
         error: 'Location not available for weather data',
-        needsLocation: true
+        needsLocation: true,
+        message: 'Please allow location access or specify a city name to get weather information.'
       };
     }
 
-    // Step 5: Build enhanced context for AI
+    // Step 6: Build enhanced context for AI - COMPLETE CONTEXT
     const enhancedContext = {
       ...weatherData,
       userMessage: message,
-      hasLocationSwitch: !!locationData,
+      hasLocationSwitch: !!locationData, // True if user specified a different location
       originalLocation: location,
       targetLocation: targetLocation,
+      locationSource: locationSource,
       // Add educational context
       isEducational: educationalResponse?.isEducational || false,
       educationalTopic: educationalResponse?.topic,
       hasEducationalImages: educationalResponse?.hasImages || false,
       // Add processing status
       dataFetched: !!weatherData,
-      processingComplete: true
+      processingComplete: true,
+      timestamp: new Date().toISOString()
     };
 
-    console.log('Sending to AI with context:', {
+    console.log('🤖 Sending to AI with context:', {
       hasWeatherData: !!weatherData,
-      isEducational: enhancedContext.isEducational,
       locationUsed: enhancedContext.locationUsed,
-      requestType: weatherData?.requestType
+      hasLocationSwitch: enhancedContext.hasLocationSwitch,
+      requestType: weatherData?.requestType,
+      coordinates: weatherData?.coordinates,
+      isEducational: enhancedContext.isEducational
     });
 
-    // Step 6: Generate AI response with all available data
+    // Step 7: Generate AI response with all available data
     const aiResponse = await generateWeatherResponse(message, enhancedContext, conversationHistory);
 
     if (!aiResponse.success) {
@@ -200,10 +271,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 7: Process the AI response for better formatting and emoji handling
+    // Step 8: Process the AI response for better formatting and emoji handling
     let processedResponse = processFriendlyResponse(aiResponse.response, enhancedContext);
 
-    // Step 8: Handle images if requested - FULL FEATURED
+    // Step 9: Handle images if requested - FULL FEATURED
     let imageResults = { images: {}, hasImages: false };
     
     if (includeImages) {
@@ -229,14 +300,14 @@ export default async function handler(req, res) {
           educationalTopic: educationalResponse?.topic
         };
       } catch (imageError) {
-        console.error('Image processing error:', imageError);
+        console.error('❌ Image processing error:', imageError);
         // Continue without images
       }
     }
 
-    console.log('Response ready, sending to client');
+    console.log('✅ Response ready, sending to client');
 
-    // Ensure proper UTF-8 encoding in response
+    // Step 10: Prepare final response with all data
     const responseData = {
       response: processedResponse,
       weatherData: enhancedContext,
@@ -246,16 +317,25 @@ export default async function handler(req, res) {
       educationalTopic: imageResults.educationalTopic,
       locationFound: locationData,
       searchedFor: searchedLocation,
-      usage: aiResponse.usage
+      usage: aiResponse.usage,
+      metadata: {
+        locationSource: locationSource,
+        timestamp: new Date().toISOString(),
+        hasLocationSwitch: !!locationData
+      }
     };
 
     return res.status(200).json(responseData);
 
   } catch (error) {
-    console.error('Chat API Error:', error);
+    console.error('💥 Chat API Error:', error);
     return res.status(500).json({ 
       error: 'Internal server error',
-      fallback: `Oops! I'm having some technical difficulties right now. ${EMOJIS.warning} Please try again in just a moment!`
+      fallback: `Oops! I'm having some technical difficulties right now. ${EMOJIS.warning} Please try again in just a moment!`,
+      debugInfo: {
+        message: error.message,
+        timestamp: new Date().toISOString()
+      }
     });
   }
 }
@@ -276,7 +356,9 @@ function processFriendlyResponse(response, context) {
     /checking.*?data.*?/gi,
     /gathering.*?information.*?/gi,
     /looking up.*?/gi,
-    /fetching.*?data.*?/gi
+    /fetching.*?data.*?/gi,
+    /please wait while.*?/gi,
+    /one moment while.*?/gi
   ];
 
   gatheringPhrases.forEach(phrase => {
@@ -312,7 +394,7 @@ function processFriendlyResponse(response, context) {
     processed = `${EMOJIS.warning} WEATHER ALERT ${EMOJIS.warning}\n\n` + processed;
   }
 
-  // Add location context if switched
+  // Add location context if switched - IMPORTANT FOR LOCATION SWITCHING
   if (context.hasLocationSwitch && context.searchedLocation) {
     processed = `${EMOJIS.location} Showing weather for ${context.locationUsed}\n\n` + processed;
   }
@@ -320,6 +402,11 @@ function processFriendlyResponse(response, context) {
   // Handle cases where no weather data was available
   if (context.needsLocation) {
     processed += `\n\n${EMOJIS.location} To get specific weather information, please allow location access or tell me which city you'd like weather for!`;
+  }
+
+  // Handle API errors gracefully
+  if (context.error && context.error.includes('temporarily unavailable')) {
+    processed += `\n\n${EMOJIS.warning} Weather data is temporarily unavailable. Please try again in a few moments.`;
   }
 
   // Clean up formatting
@@ -373,7 +460,8 @@ function fixBrokenEmojis(text) {
     // Common broken patterns
     '??': EMOJIS.sunny,
     '? ': EMOJIS.sunny + ' ',
-    '?\n': EMOJIS.sunny + '\n'
+    '?\n': EMOJIS.sunny + '\n',
+    '?\t': EMOJIS.sunny + '\t'
   };
 
   let fixed = text;
@@ -422,6 +510,25 @@ function addWeatherEmojis(text, weatherData) {
   if (condition.includes('clear') || description.includes('clear')) {
     enhanced = enhanced.replace(/\b(clear|sunny|sunshine)\b/gi, `$1 ${EMOJIS.sunny}`);
   }
+  if (condition.includes('cloud') || description.includes('cloud')) {
+    enhanced = enhanced.replace(/\b(cloud|cloudy|overcast)\b/gi, `$1 ${EMOJIS.sunny}`);
+  }
 
   return enhanced;
+}
+
+// Helper function to validate coordinates
+function validateCoordinates(lat, lon) {
+  return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
+
+// Helper function to clean location names
+function cleanLocationName(location) {
+  if (!location) return location;
+  
+  // Remove common prefixes/suffixes that might interfere
+  return location
+    .replace(/^(the\s+|city\s+of\s+|town\s+of\s+)/i, '')
+    .replace(/\s+(city|town|county|state|country)$/i, '')
+    .trim();
 }
