@@ -1,5 +1,6 @@
 import { generateWeatherResponse, generateEnhancedWeatherResponse } from '../../lib/openai';
 import { getCurrentWeather, getWeatherForecast, getNWSAlerts, getCompleteWeatherData, searchLocation, extractLocationFromMessage } from '../../lib/weather';
+import { generateEducationalWeatherResponse } from '../../lib/weatherEducation';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -16,8 +17,19 @@ export default async function handler(req, res) {
     let weatherData = null;
     let locationData = null;
     let searchedLocation = null;
+    let educationalResponse = null;
 
-    // Step 1: Check if user is asking about a specific location
+    // Step 1: Check if this is an educational weather query
+    if (includeImages) {
+      educationalResponse = await generateEducationalWeatherResponse(
+        message, 
+        weatherData, 
+        conversationHistory, 
+        location
+      );
+    }
+
+    // Step 2: Check if user is asking about a specific location
     const locationFromMessage = extractLocationFromMessage(message);
     
     if (locationFromMessage) {
@@ -34,12 +46,12 @@ export default async function handler(req, res) {
       }
     }
 
-    // Step 2: Use the found location or fallback to user's current location
+    // Step 3: Use the found location or fallback to user's current location
     const targetLocation = locationData || location;
 
     if (targetLocation?.lat && targetLocation?.lon) {
       try {
-        // Step 3: Check what type of data the user is asking for
+        // Step 4: Check what type of data the user is asking for
         const needsAlerts = /\b(watch|warning|alert|advisory|severe|storm|tornado|hurricane|flood|emergency)\b/i.test(message);
         const needsForecast = /\b(forecast|tomorrow|week|days|upcoming|future)\b/i.test(message);
         const needsCurrent = /\b(now|current|today|right now|currently)\b/i.test(message) || (!needsAlerts && !needsForecast);
@@ -108,19 +120,24 @@ export default async function handler(req, res) {
       }
     }
 
-    // Step 4: Generate AI response with context
+    // Step 5: Generate AI response with context
     const enhancedContext = {
       ...weatherData,
       userMessage: message,
       hasLocationSwitch: !!locationData,
       originalLocation: location,
-      targetLocation: targetLocation
+      targetLocation: targetLocation,
+      // Add educational context
+      isEducational: educationalResponse?.isEducational || false,
+      educationalTopic: educationalResponse?.topic,
+      hasEducationalImages: educationalResponse?.hasImages || false
     };
 
     console.log('Sending to AI:', {
       message,
       contextKeys: Object.keys(enhancedContext),
-      locationUsed: enhancedContext.locationUsed
+      locationUsed: enhancedContext.locationUsed,
+      isEducational: enhancedContext.isEducational
     });
 
     const aiResponse = await generateWeatherResponse(message, enhancedContext, conversationHistory);
@@ -132,16 +149,30 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 5: Generate enhanced response with images
+    // Step 6: Combine regular weather images with educational images
     let imageResults = { images: {}, hasImages: false };
     
-    if (weatherData && includeImages) {
-      imageResults = await generateEnhancedWeatherResponse(
+    if (includeImages) {
+      // Get regular weather images (DALL-E generated)
+      const regularImages = await generateEnhancedWeatherResponse(
         message, 
         weatherData, 
         conversationHistory, 
         includeImages
       );
+
+      // Combine with educational images
+      const combinedImages = {
+        ...regularImages.images,
+        ...(educationalResponse?.images || {})
+      };
+
+      imageResults = {
+        images: combinedImages,
+        hasImages: Object.keys(combinedImages).length > 0,
+        isEducational: educationalResponse?.isEducational || false,
+        educationalTopic: educationalResponse?.topic
+      };
     }
 
     return res.status(200).json({
@@ -149,6 +180,8 @@ export default async function handler(req, res) {
       weatherData: enhancedContext,
       images: imageResults.images,
       hasImages: imageResults.hasImages,
+      isEducational: imageResults.isEducational,
+      educationalTopic: imageResults.educationalTopic,
       locationFound: locationData,
       searchedFor: searchedLocation,
       usage: aiResponse.usage
