@@ -1,3 +1,4 @@
+// pages/api/chat.js - Enhanced with friendly response processing
 import { generateWeatherResponse, generateEnhancedWeatherResponse } from '../../lib/openai';
 import { getCurrentWeather, getWeatherForecast, getNWSAlerts, getCompleteWeatherData, searchLocation, extractLocationFromMessage } from '../../lib/weather';
 import { generateEducationalWeatherResponse } from '../../lib/weatherEducation';
@@ -149,7 +150,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 6: Combine regular weather images with educational images
+    // Step 6: Process the AI response to make it even more friendly
+    let processedResponse = processFriendlyResponse(aiResponse.response, enhancedContext);
+
+    // Step 7: Combine regular weather images with educational images
     let imageResults = { images: {}, hasImages: false };
     
     if (includeImages) {
@@ -176,7 +180,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      response: aiResponse.response,
+      response: processedResponse,
       weatherData: enhancedContext,
       images: imageResults.images,
       hasImages: imageResults.hasImages,
@@ -191,7 +195,90 @@ export default async function handler(req, res) {
     console.error('Chat API Error:', error);
     return res.status(500).json({ 
       error: 'Internal server error',
-      fallback: "I'm experiencing technical difficulties. Please try again in a moment."
+      fallback: "Oops! I'm having some technical difficulties right now. 😅 Please try again in just a moment!"
     });
   }
+}
+
+// Function to post-process AI responses for better readability
+function processFriendlyResponse(response, context) {
+  let processed = response;
+
+  // Remove any asterisks that might have slipped through
+  processed = processed.replace(/\*([^*]+)\*/g, '$1');
+  processed = processed.replace(/\*\*/g, '');
+
+  // Add spacing around emojis for better readability
+  processed = processed.replace(/([^\s])([🌀🌤️🌦️🌧️⛈️🌨️🌩️🌪️🌈☀️⭐🌟💫🔥❄️🧊💧💨🌊⚡🌙🌛🌜🌚🌕🌖🌗🌘🌑🌒🌓🌔])/g, '$1 $2');
+  processed = processed.replace(/([🌀🌤️🌦️🌧️⛈️🌨️🌩️🌪️🌈☀️⭐🌟💫🔥❄️🧊💧💨🌊⚡🌙🌛🌜🌚🌕🌖🌗🌘🌑🌒🌓🌔])([^\s])/g, '$1 $2');
+
+  // Add weather-specific closing encouragements based on context
+  if (context.isEducational) {
+    const educationalClosings = [
+      "\n\n🎓 Keep exploring the fascinating world of weather! Feel free to ask more questions.",
+      "\n\n📚 Weather science is amazing when you understand it! What else would you like to learn?",
+      "\n\n🔍 Great question! Understanding weather patterns helps you stay safe and informed.",
+      "\n\n⚡ Weather education is so important! Ask me anything else you're curious about."
+    ];
+    const randomClosing = educationalClosings[Math.floor(Math.random() * educationalClosings.length)];
+    processed += randomClosing;
+  } else if (context.current || context.forecast) {
+    const weatherClosings = [
+      "\n\n🌟 Stay weather-aware and have a great day!",
+      "\n\n☀️ Hope this helps with your weather planning!",
+      "\n\n🌤️ Anything else you'd like to know about the weather?",
+      "\n\n⭐ Stay safe out there!"
+    ];
+    const randomClosing = weatherClosings[Math.floor(Math.random() * weatherClosings.length)];
+    processed += randomClosing;
+  }
+
+  // Add urgency indicators for severe weather
+  if (context.alerts && context.alerts.alertCount > 0) {
+    processed = "⚠️ **WEATHER ALERT** ⚠️\n\n" + processed;
+  }
+
+  // Add location context if switched
+  if (context.hasLocationSwitch && context.searchedLocation) {
+    processed = `📍 Showing weather for ${context.locationUsed}\n\n` + processed;
+  }
+
+  // Clean up any double line breaks
+  processed = processed.replace(/\n\n\n+/g, '\n\n');
+  
+  // Ensure proper spacing after periods
+  processed = processed.replace(/\.([A-Z])/g, '. $1');
+
+  return processed.trim();
+}
+
+// Helper function to add contextual emojis based on weather conditions
+function addContextualEmojis(text, weatherData) {
+  if (!weatherData?.current) return text;
+
+  const condition = weatherData.current.condition?.toLowerCase() || '';
+  const temp = weatherData.current.temperature || 70;
+
+  // Add temperature context
+  if (temp > 85) {
+    text = text.replace(/hot|warm|heat/gi, match => `${match} 🔥`);
+  } else if (temp < 32) {
+    text = text.replace(/cold|freeze|freezing|ice/gi, match => `${match} 🧊`);
+  }
+
+  // Add condition-specific emojis
+  if (condition.includes('rain')) {
+    text = text.replace(/rain|shower|drizzle/gi, match => `${match} 🌧️`);
+  }
+  if (condition.includes('snow')) {
+    text = text.replace(/snow|blizzard/gi, match => `${match} ❄️`);
+  }
+  if (condition.includes('thunder')) {
+    text = text.replace(/thunder|lightning/gi, match => `${match} ⚡`);
+  }
+  if (condition.includes('wind')) {
+    text = text.replace(/wind|windy|gusty/gi, match => `${match} 💨`);
+  }
+
+  return text;
 }
