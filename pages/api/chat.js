@@ -1,6 +1,6 @@
 import { generateWeatherResponse } from '../../lib/openai';
 import { getCurrentWeather, getWeatherForecast } from '../../lib/weather';
-
+import { generateEnhancedWeatherResponse } from '../../lib/weatherImages';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
