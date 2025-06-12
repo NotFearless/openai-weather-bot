@@ -1,9 +1,7 @@
-// pages/api/chat.js - Fixed with proper emoji encoding
+// pages/api/chat.js - Complete full-featured version
 import { generateWeatherResponse, generateEnhancedWeatherResponse } from '../../lib/openai';
 import { getCurrentWeather, getWeatherForecast, getNWSAlerts, getCompleteWeatherData, searchLocation, extractLocationFromMessage } from '../../lib/weather';
 import { generateEducationalWeatherResponse } from '../../lib/weatherEducation';
-
-// Note: API configuration is handled in next.config.js for Next.js 14
 
 // Safe emoji constants
 const EMOJIS = {
@@ -17,7 +15,13 @@ const EMOJIS = {
   books: '📚',
   radar: '📡',
   check: '✅',
-  arrow: '➡️'
+  arrow: '➡️',
+  sparkles: '✨',
+  tornado: '🌪️',
+  hurricane: '🌀',
+  lightning: '⚡',
+  satellite: '🛰️',
+  magnify: '🔍'
 };
 
 export default async function handler(req, res) {
@@ -199,7 +203,7 @@ export default async function handler(req, res) {
     // Step 7: Process the AI response for better formatting and emoji handling
     let processedResponse = processFriendlyResponse(aiResponse.response, enhancedContext);
 
-    // Step 8: Handle images if requested
+    // Step 8: Handle images if requested - FULL FEATURED
     let imageResults = { images: {}, hasImages: false };
     
     if (includeImages) {
@@ -245,18 +249,14 @@ export default async function handler(req, res) {
       usage: aiResponse.usage
     };
 
-    // Convert to JSON with proper UTF-8 encoding
-    const jsonResponse = JSON.stringify(responseData, null, 0);
-    
-    return res.status(200).send(jsonResponse);
+    return res.status(200).json(responseData);
 
   } catch (error) {
     console.error('Chat API Error:', error);
-    const errorResponse = JSON.stringify({ 
+    return res.status(500).json({ 
       error: 'Internal server error',
       fallback: `Oops! I'm having some technical difficulties right now. ${EMOJIS.warning} Please try again in just a moment!`
     });
-    return res.status(500).send(errorResponse);
   }
 }
 
@@ -338,65 +338,57 @@ function processFriendlyResponse(response, context) {
 // Function to fix broken emojis (question marks -> proper emojis)
 function fixBrokenEmojis(text) {
   const emojiMappings = {
-    // Weather emojis
-    '☀?': '☀️',  // Sun
-    '⛅?': '⛅',  // Partly cloudy
-    '☁?': '☁️',  // Cloudy
-    '🌧?': '🌧️', // Rain
-    '⛈?': '⛈️', // Storm
-    '❄?': '❄️',  // Snow
-    '🌫?': '🌫️', // Fog
-    '💨?': '💨',  // Wind
-    '🔥?': '🔥',  // Fire/hot
-    '🧊?': '🧊',  // Ice/cold
-    '☂?': '☂️',  // Umbrella
-    '🌡?': '🌡️', // Thermometer
+    // Weather emojis - Fixed patterns
+    '☀?': '☀️',
+    '⛅?': '⛅',
+    '☁?': '☁️',
+    '🌧?': '🌧️',
+    '⛈?': '⛈️',
+    '❄?': '❄️',
+    '🌫?': '🌫️',
+    '💨?': '💨',
+    '🔥?': '🔥',
+    '🧊?': '🧊',
+    '☂?': '☂️',
+    '🌡?': '🌡️',
     
     // Educational emojis
-    '📚?': '📚',  // Books
-    '🔍?': '🔍',  // Magnifying glass
-    '📡?': '📡',  // Radar
-    '🛰?': '🛰️', // Satellite
-    '🌪?': '🌪️', // Tornado
-    '🌀?': '🌀',  // Hurricane
-    '⚡?': '⚡',  // Lightning
+    '📚?': '📚',
+    '🔍?': '🔍',
+    '📡?': '📡',
+    '🛰?': '🛰️',
+    '🌪?': '🌪️',
+    '🌀?': '🌀',
+    '⚡?': '⚡',
     
     // Interface emojis
-    '⚠?': '⚠️',  // Warning
-    '📍?': '📍',  // Location
-    '⭐?': '⭐',  // Star
-    '✨?': '✨',  // Sparkles
-    '✅?': '✅',  // Check
-    '❌?': '❌',  // Cross
-    '➡?': '➡️',  // Arrow
-    
-    // General weather
-    '🌈?': '🌈',  // Rainbow
-    '🌅?': '🌅',  // Sunrise
-    '🌇?': '🌇',  // Sunset
-    '🌙?': '🌙',  // Moon
-    '🌟?': '🌟',  // Star
+    '⚠?': '⚠️',
+    '📍?': '📍',
+    '⭐?': '⭐',
+    '✨?': '✨',
+    '✅?': '✅',
+    '❌?': '❌',
+    '➡?': '➡️',
     
     // Common broken patterns
-    '??': '☀️',   // Generic broken emoji -> sun
-    '? ': '☀️ ',  // Broken emoji with space
-    '?\n': '☀️\n', // Broken emoji with newline
+    '??': EMOJIS.sunny,
+    '? ': EMOJIS.sunny + ' ',
+    '?\n': EMOJIS.sunny + '\n'
   };
 
   let fixed = text;
   
-  // Apply emoji fixes
+  // Apply emoji fixes safely
   Object.entries(emojiMappings).forEach(([broken, correct]) => {
-    const regex = new RegExp(broken.replace(/[.*+?^${}()|[\]\\]/g, '\\  // Clean up formatting
-  processed = processed.replace(/\n\n\n+/g, '\n\n');
-  processed = processed.replace(/\.([A-Z])/g, '. $1');'), 'g');
-    fixed = fixed.replace(regex, correct);
+    try {
+      const escapedBroken = broken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedBroken, 'g');
+      fixed = fixed.replace(regex, correct);
+    } catch (error) {
+      console.warn('Emoji replacement error for pattern:', broken);
+    }
   });
 
-  // Handle generic question marks that might be broken emojis
-  // Look for question marks in typical emoji positions (start of line, after space)
-  fixed = fixed.replace(/(\s|^)\?(\s)/g, '$1☀️$2');
-  
   return fixed;
 }
 
@@ -414,27 +406,21 @@ function addWeatherEmojis(text, weatherData) {
   if (temp > 85) {
     enhanced = enhanced.replace(/\b(hot|warm|heat|toasty)\b/gi, `$1 ${EMOJIS.sunny}`);
   } else if (temp < 32) {
-    enhanced = enhanced.replace(/\b(cold|freeze|freezing|ice|chilly)\b/gi, `$1 ❄️`);
+    enhanced = enhanced.replace(/\b(cold|freeze|freezing|ice|chilly)\b/gi, `$1 ${EMOJIS.snow}`);
   }
 
   // Add condition-based emojis
   if (condition.includes('rain') || description.includes('rain')) {
-    enhanced = enhanced.replace(/\b(rain|shower|drizzle|precipitation)\b/gi, `$1 🌧️`);
+    enhanced = enhanced.replace(/\b(rain|shower|drizzle|precipitation)\b/gi, `$1 ${EMOJIS.rain}`);
   }
   if (condition.includes('snow') || description.includes('snow')) {
-    enhanced = enhanced.replace(/\b(snow|blizzard|flurries)\b/gi, `$1 ❄️`);
+    enhanced = enhanced.replace(/\b(snow|blizzard|flurries)\b/gi, `$1 ${EMOJIS.snow}`);
   }
   if (condition.includes('thunder') || description.includes('thunder')) {
-    enhanced = enhanced.replace(/\b(thunder|lightning|storm)\b/gi, `$1 ⛈️`);
-  }
-  if (condition.includes('wind') || description.includes('wind')) {
-    enhanced = enhanced.replace(/\b(wind|windy|gusty|breezy)\b/gi, `$1 💨`);
+    enhanced = enhanced.replace(/\b(thunder|lightning|storm)\b/gi, `$1 ${EMOJIS.storm}`);
   }
   if (condition.includes('clear') || description.includes('clear')) {
-    enhanced = enhanced.replace(/\b(clear|sunny|sunshine)\b/gi, `$1 ☀️`);
-  }
-  if (condition.includes('cloud') || description.includes('cloud')) {
-    enhanced = enhanced.replace(/\b(cloud|cloudy|overcast)\b/gi, `$1 ☁️`);
+    enhanced = enhanced.replace(/\b(clear|sunny|sunshine)\b/gi, `$1 ${EMOJIS.sunny}`);
   }
 
   return enhanced;
