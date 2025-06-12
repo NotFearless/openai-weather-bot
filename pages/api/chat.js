@@ -330,3 +330,117 @@ function processFriendlyResponse(response, context) {
   // Clean up formatting
   processed = processed.replace(/\n\n\n+/g, '\n\n');
   processed = processed.replace(/\.([A-Z])/g, '. $1');
+  processed = processed.trim();
+
+  // Ensure we don't have empty responses
+  if (!processed || processed.length < 10) {
+    processed = `${EMOJIS.sunny} I'm ready to help with weather information or answer your weather questions! What would you like to know?`;
+  }
+
+  return processed;
+}
+
+// Function to fix broken emojis (question marks -> proper emojis)
+function fixBrokenEmojis(text) {
+  const emojiMappings = {
+    // Weather emojis
+    '☀?': '☀️',  // Sun
+    '⛅?': '⛅',  // Partly cloudy
+    '☁?': '☁️',  // Cloudy
+    '🌧?': '🌧️', // Rain
+    '⛈?': '⛈️', // Storm
+    '❄?': '❄️',  // Snow
+    '🌫?': '🌫️', // Fog
+    '💨?': '💨',  // Wind
+    '🔥?': '🔥',  // Fire/hot
+    '🧊?': '🧊',  // Ice/cold
+    '☂?': '☂️',  // Umbrella
+    '🌡?': '🌡️', // Thermometer
+    
+    // Educational emojis
+    '📚?': '📚',  // Books
+    '🔍?': '🔍',  // Magnifying glass
+    '📡?': '📡',  // Radar
+    '🛰?': '🛰️', // Satellite
+    '🌪?': '🌪️', // Tornado
+    '🌀?': '🌀',  // Hurricane
+    '⚡?': '⚡',  // Lightning
+    
+    // Interface emojis
+    '⚠?': '⚠️',  // Warning
+    '📍?': '📍',  // Location
+    '⭐?': '⭐',  // Star
+    '✨?': '✨',  // Sparkles
+    '✅?': '✅',  // Check
+    '❌?': '❌',  // Cross
+    '➡?': '➡️',  // Arrow
+    
+    // General weather
+    '🌈?': '🌈',  // Rainbow
+    '🌅?': '🌅',  // Sunrise
+    '🌇?': '🌇',  // Sunset
+    '🌙?': '🌙',  // Moon
+    '🌟?': '🌟',  // Star
+    
+    // Common broken patterns
+    '??': '☀️',   // Generic broken emoji -> sun
+    '? ': '☀️ ',  // Broken emoji with space
+    '?\n': '☀️\n', // Broken emoji with newline
+  };
+
+  let fixed = text;
+  
+  // Apply emoji fixes
+  Object.entries(emojiMappings).forEach(([broken, correct]) => {
+    const regex = new RegExp(broken.replace(/[.*+?^${}()|[\]\\]/g, '\\  // Clean up formatting
+  processed = processed.replace(/\n\n\n+/g, '\n\n');
+  processed = processed.replace(/\.([A-Z])/g, '. $1');'), 'g');
+    fixed = fixed.replace(regex, correct);
+  });
+
+  // Handle generic question marks that might be broken emojis
+  // Look for question marks in typical emoji positions (start of line, after space)
+  fixed = fixed.replace(/(\s|^)\?(\s)/g, '$1☀️$2');
+  
+  return fixed;
+}
+
+// Helper function to add contextual emojis based on weather conditions
+function addWeatherEmojis(text, weatherData) {
+  if (!weatherData?.current) return text;
+
+  const condition = weatherData.current.condition?.toLowerCase() || '';
+  const description = weatherData.current.description?.toLowerCase() || '';
+  const temp = weatherData.current.temperature || 70;
+
+  let enhanced = text;
+
+  // Add temperature-based emojis
+  if (temp > 85) {
+    enhanced = enhanced.replace(/\b(hot|warm|heat|toasty)\b/gi, `$1 ${EMOJIS.sunny}`);
+  } else if (temp < 32) {
+    enhanced = enhanced.replace(/\b(cold|freeze|freezing|ice|chilly)\b/gi, `$1 ❄️`);
+  }
+
+  // Add condition-based emojis
+  if (condition.includes('rain') || description.includes('rain')) {
+    enhanced = enhanced.replace(/\b(rain|shower|drizzle|precipitation)\b/gi, `$1 🌧️`);
+  }
+  if (condition.includes('snow') || description.includes('snow')) {
+    enhanced = enhanced.replace(/\b(snow|blizzard|flurries)\b/gi, `$1 ❄️`);
+  }
+  if (condition.includes('thunder') || description.includes('thunder')) {
+    enhanced = enhanced.replace(/\b(thunder|lightning|storm)\b/gi, `$1 ⛈️`);
+  }
+  if (condition.includes('wind') || description.includes('wind')) {
+    enhanced = enhanced.replace(/\b(wind|windy|gusty|breezy)\b/gi, `$1 💨`);
+  }
+  if (condition.includes('clear') || description.includes('clear')) {
+    enhanced = enhanced.replace(/\b(clear|sunny|sunshine)\b/gi, `$1 ☀️`);
+  }
+  if (condition.includes('cloud') || description.includes('cloud')) {
+    enhanced = enhanced.replace(/\b(cloud|cloudy|overcast)\b/gi, `$1 ☁️`);
+  }
+
+  return enhanced;
+}
