@@ -1,8 +1,34 @@
+// pages/api/chat.js - Fixed with proper emoji encoding
 import { generateWeatherResponse, generateEnhancedWeatherResponse } from '../../lib/openai';
 import { getCurrentWeather, getWeatherForecast, getNWSAlerts, getCompleteWeatherData, searchLocation, extractLocationFromMessage } from '../../lib/weather';
 import { generateEducationalWeatherResponse } from '../../lib/weatherEducation';
 
+// Set proper content type for UTF-8 encoding
+export const config = {
+  api: {
+    responseLimit: false,
+  },
+}
+
+// Safe emoji constants
+const EMOJIS = {
+  sunny: '☀️',
+  rain: '🌧️',
+  storm: '⛈️',
+  snow: '❄️',
+  warning: '⚠️',
+  location: '📍',
+  star: '⭐',
+  books: '📚',
+  radar: '📡',
+  check: '✅',
+  arrow: '➡️'
+};
+
 export default async function handler(req, res) {
+  // Set proper headers for UTF-8 encoding
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -14,19 +40,28 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
+    console.log('Processing message:', message);
+
+    // Initialize response data
     let weatherData = null;
     let locationData = null;
     let searchedLocation = null;
     let educationalResponse = null;
 
-    // Step 1: Check if this is an educational weather query
-    if (includeImages) {
-      educationalResponse = await generateEducationalWeatherResponse(
-        message, 
-        weatherData, 
-        conversationHistory, 
-        location
-      );
+    // Step 1: Check if this is an educational weather query FIRST
+    try {
+      if (includeImages) {
+        educationalResponse = await generateEducationalWeatherResponse(
+          message, 
+          null, // Pass null initially, will be filled later if needed
+          conversationHistory, 
+          location
+        );
+        console.log('Educational response:', educationalResponse?.isEducational);
+      }
+    } catch (error) {
+      console.error('Educational response error:', error);
+      // Continue processing even if educational fails
     }
 
     // Step 2: Check if user is asking about a specific location
@@ -35,31 +70,42 @@ export default async function handler(req, res) {
     if (locationFromMessage) {
       console.log(`Extracted location from message: ${locationFromMessage}`);
       
-      // Search for the mentioned location
-      const searchResult = await searchLocation(locationFromMessage);
-      if (searchResult.success && searchResult.data.length > 0) {
-        locationData = searchResult.data[0]; // Use the best match
-        searchedLocation = locationFromMessage;
-        console.log(`Found location: ${locationData.displayName}`);
-      } else {
-        console.log(`Could not find location: ${locationFromMessage}`);
+      try {
+        // Search for the mentioned location
+        const searchResult = await searchLocation(locationFromMessage);
+        if (searchResult.success && searchResult.data.length > 0) {
+          locationData = searchResult.data[0]; // Use the best match
+          searchedLocation = locationFromMessage;
+          console.log(`Found location: ${locationData.displayName}`);
+        } else {
+          console.log(`Could not find location: ${locationFromMessage}`);
+        }
+      } catch (error) {
+        console.error('Location search error:', error);
+        // Continue with user's current location
       }
     }
 
     // Step 3: Use the found location or fallback to user's current location
     const targetLocation = locationData || location;
 
-    if (targetLocation?.lat && targetLocation?.lon) {
+    // Step 4: Determine what weather data we need based on the query
+    const needsWeatherData = /\b(weather|temperature|temp|rain|snow|wind|humidity|forecast|alert|warning|storm|cloudy|sunny|conditions)\b/i.test(message);
+    
+    if (needsWeatherData && targetLocation?.lat && targetLocation?.lon) {
+      console.log('Fetching weather data for:', targetLocation);
+      
       try {
-        // Step 4: Check what type of data the user is asking for
+        // Check what type of data the user is asking for
         const needsAlerts = /\b(watch|warning|alert|advisory|severe|storm|tornado|hurricane|flood|emergency)\b/i.test(message);
         const needsForecast = /\b(forecast|tomorrow|week|days|upcoming|future)\b/i.test(message);
         const needsCurrent = /\b(now|current|today|right now|currently)\b/i.test(message) || (!needsAlerts && !needsForecast);
 
         console.log(`Data needs - Alerts: ${needsAlerts}, Forecast: ${needsForecast}, Current: ${needsCurrent}`);
 
+        // Fetch appropriate weather data
         if (needsAlerts) {
-          // Get complete weather data including alerts
+          console.log('Fetching weather data with alerts...');
           const completeData = await getCompleteWeatherData(targetLocation.lat, targetLocation.lon, true);
           if (completeData.success) {
             weatherData = {
@@ -68,9 +114,10 @@ export default async function handler(req, res) {
               searchedLocation: searchedLocation,
               locationUsed: locationData ? locationData.displayName : 'current location'
             };
+            console.log('Weather data with alerts fetched successfully');
           }
         } else if (needsForecast && needsCurrent) {
-          // Get both current and forecast
+          console.log('Fetching current and forecast data...');
           const [currentWeather, forecast] = await Promise.all([
             getCurrentWeather(targetLocation.lat, targetLocation.lon),
             getWeatherForecast(targetLocation.lat, targetLocation.lon)
@@ -83,8 +130,9 @@ export default async function handler(req, res) {
             searchedLocation: searchedLocation,
             locationUsed: locationData ? locationData.displayName : 'current location'
           };
+          console.log('Current and forecast data fetched successfully');
         } else if (needsForecast) {
-          // Get forecast only
+          console.log('Fetching forecast data...');
           const forecast = await getWeatherForecast(targetLocation.lat, targetLocation.lon);
           weatherData = {
             forecast: forecast.success ? forecast.data : null,
@@ -92,8 +140,9 @@ export default async function handler(req, res) {
             searchedLocation: searchedLocation,
             locationUsed: locationData ? locationData.displayName : 'current location'
           };
+          console.log('Forecast data fetched successfully');
         } else {
-          // Get current weather only
+          console.log('Fetching current weather data...');
           const currentWeather = await getCurrentWeather(targetLocation.lat, targetLocation.lon);
           weatherData = {
             current: currentWeather.success ? currentWeather.data : null,
@@ -101,26 +150,25 @@ export default async function handler(req, res) {
             searchedLocation: searchedLocation,
             locationUsed: locationData ? locationData.displayName : 'current location'
           };
+          console.log('Current weather data fetched successfully');
         }
       } catch (weatherError) {
-        console.log('Weather API failed:', weatherError.message);
+        console.error('Weather API failed:', weatherError.message);
         weatherData = {
-          error: 'Weather data unavailable',
+          error: 'Weather data temporarily unavailable',
           searchedLocation: searchedLocation,
           locationUsed: locationData ? locationData.displayName : 'current location'
         };
       }
-    } else {
-      console.log('No valid coordinates found');
-      if (searchedLocation) {
-        weatherData = {
-          error: `Could not find coordinates for "${searchedLocation}"`,
-          searchedLocation: searchedLocation
-        };
-      }
+    } else if (needsWeatherData && !targetLocation) {
+      console.log('Weather requested but no location available');
+      weatherData = {
+        error: 'Location not available for weather data',
+        needsLocation: true
+      };
     }
 
-    // Step 5: Generate AI response with context
+    // Step 5: Build enhanced context for AI
     const enhancedContext = {
       ...weatherData,
       userMessage: message,
@@ -130,55 +178,67 @@ export default async function handler(req, res) {
       // Add educational context
       isEducational: educationalResponse?.isEducational || false,
       educationalTopic: educationalResponse?.topic,
-      hasEducationalImages: educationalResponse?.hasImages || false
+      hasEducationalImages: educationalResponse?.hasImages || false,
+      // Add processing status
+      dataFetched: !!weatherData,
+      processingComplete: true
     };
 
-    console.log('Sending to AI:', {
-      message,
-      contextKeys: Object.keys(enhancedContext),
+    console.log('Sending to AI with context:', {
+      hasWeatherData: !!weatherData,
+      isEducational: enhancedContext.isEducational,
       locationUsed: enhancedContext.locationUsed,
-      isEducational: enhancedContext.isEducational
+      requestType: weatherData?.requestType
     });
 
+    // Step 6: Generate AI response with all available data
     const aiResponse = await generateWeatherResponse(message, enhancedContext, conversationHistory);
 
     if (!aiResponse.success) {
       return res.status(500).json({ 
         error: 'AI service unavailable',
-        fallback: aiResponse.fallback 
+        fallback: aiResponse.fallback || `I'm having trouble generating a response right now. ${EMOJIS.warning} Please try again in a moment.`
       });
     }
 
-    // Step 6: Process the AI response to make it even more friendly
+    // Step 7: Process the AI response for better formatting and emoji handling
     let processedResponse = processFriendlyResponse(aiResponse.response, enhancedContext);
 
-    // Step 7: Combine regular weather images with educational images
+    // Step 8: Handle images if requested
     let imageResults = { images: {}, hasImages: false };
     
     if (includeImages) {
-      // Get regular weather images (DALL-E generated)
-      const regularImages = await generateEnhancedWeatherResponse(
-        message, 
-        weatherData, 
-        conversationHistory, 
-        includeImages
-      );
+      try {
+        // Get regular weather images (DALL-E generated)
+        const regularImages = await generateEnhancedWeatherResponse(
+          message, 
+          weatherData, 
+          conversationHistory, 
+          includeImages
+        );
 
-      // Combine with educational images
-      const combinedImages = {
-        ...regularImages.images,
-        ...(educationalResponse?.images || {})
-      };
+        // Combine with educational images
+        const combinedImages = {
+          ...regularImages.images,
+          ...(educationalResponse?.images || {})
+        };
 
-      imageResults = {
-        images: combinedImages,
-        hasImages: Object.keys(combinedImages).length > 0,
-        isEducational: educationalResponse?.isEducational || false,
-        educationalTopic: educationalResponse?.topic
-      };
+        imageResults = {
+          images: combinedImages,
+          hasImages: Object.keys(combinedImages).length > 0,
+          isEducational: educationalResponse?.isEducational || false,
+          educationalTopic: educationalResponse?.topic
+        };
+      } catch (imageError) {
+        console.error('Image processing error:', imageError);
+        // Continue without images
+      }
     }
 
-    return res.status(200).json({
+    console.log('Response ready, sending to client');
+
+    // Ensure proper UTF-8 encoding in response
+    const responseData = {
       response: processedResponse,
       weatherData: enhancedContext,
       images: imageResults.images,
@@ -188,18 +248,24 @@ export default async function handler(req, res) {
       locationFound: locationData,
       searchedFor: searchedLocation,
       usage: aiResponse.usage
-    });
+    };
+
+    // Convert to JSON with proper UTF-8 encoding
+    const jsonResponse = JSON.stringify(responseData, null, 0);
+    
+    return res.status(200).send(jsonResponse);
 
   } catch (error) {
     console.error('Chat API Error:', error);
-    return res.status(500).json({ 
+    const errorResponse = JSON.stringify({ 
       error: 'Internal server error',
-      fallback: "Oops! I'm having some technical difficulties right now. Please try again in just a moment!"
+      fallback: `Oops! I'm having some technical difficulties right now. ${EMOJIS.warning} Please try again in just a moment!`
     });
+    return res.status(500).send(errorResponse);
   }
 }
 
-// Function to post-process AI responses for better readability
+// Function to post-process AI responses for better readability and emoji handling
 function processFriendlyResponse(response, context) {
   let processed = response;
 
@@ -207,22 +273,40 @@ function processFriendlyResponse(response, context) {
   processed = processed.replace(/\*([^*]+)\*/g, '$1');
   processed = processed.replace(/\*\*/g, '');
 
+  // Remove any "gathering information" type phrases that might have slipped through
+  const gatheringPhrases = [
+    /let me (?:check|gather|look up|find|get|fetch).*?information/gi,
+    /i'll (?:check|gather|look up|find|get|fetch).*?for you/gi,
+    /hold on while i.*?/gi,
+    /checking.*?data.*?/gi,
+    /gathering.*?information.*?/gi,
+    /looking up.*?/gi,
+    /fetching.*?data.*?/gi
+  ];
+
+  gatheringPhrases.forEach(phrase => {
+    processed = processed.replace(phrase, '');
+  });
+
+  // Fix any broken emojis
+  processed = fixBrokenEmojis(processed);
+
   // Add friendly closings based on context
   if (context.isEducational) {
     const educationalClosings = [
-      "\n\n>> Keep exploring the fascinating world of weather! Feel free to ask more questions.",
-      "\n\n>> Weather science is amazing when you understand it! What else would you like to learn?",
-      "\n\n>> Great question! Understanding weather patterns helps you stay safe and informed.",
-      "\n\n>> Weather education is so important! Ask me anything else you're curious about."
+      `\n\n${EMOJIS.books} Keep exploring the fascinating world of weather! Feel free to ask more questions.`,
+      `\n\n${EMOJIS.star} Weather science is amazing when you understand it! What else would you like to learn?`,
+      `\n\n${EMOJIS.check} Great question! Understanding weather patterns helps you stay safe and informed.`,
+      `\n\n${EMOJIS.books} Weather education is so important! Ask me anything else you're curious about.`
     ];
     const randomClosing = educationalClosings[Math.floor(Math.random() * educationalClosings.length)];
     processed += randomClosing;
   } else if (context.current || context.forecast) {
     const weatherClosings = [
-      "\n\n>> Stay weather-aware and have a great day!",
-      "\n\n>> Hope this helps with your weather planning!",
-      "\n\n>> Anything else you'd like to know about the weather?",
-      "\n\n>> Stay safe out there!"
+      `\n\n${EMOJIS.star} Stay weather-aware and have a great day!`,
+      `\n\n${EMOJIS.check} Hope this helps with your weather planning!`,
+      `\n\n${EMOJIS.sunny} Anything else you'd like to know about the weather?`,
+      `\n\n${EMOJIS.star} Stay safe out there!`
     ];
     const randomClosing = weatherClosings[Math.floor(Math.random() * weatherClosings.length)];
     processed += randomClosing;
@@ -230,53 +314,19 @@ function processFriendlyResponse(response, context) {
 
   // Add urgency indicators for severe weather
   if (context.alerts && context.alerts.alertCount > 0) {
-    processed = "*** WEATHER ALERT ***\n\n" + processed;
+    processed = `${EMOJIS.warning} WEATHER ALERT ${EMOJIS.warning}\n\n` + processed;
   }
 
   // Add location context if switched
   if (context.hasLocationSwitch && context.searchedLocation) {
-    processed = `>> Showing weather for ${context.locationUsed}\n\n` + processed;
+    processed = `${EMOJIS.location} Showing weather for ${context.locationUsed}\n\n` + processed;
   }
 
-  // Clean up any double line breaks
+  // Handle cases where no weather data was available
+  if (context.needsLocation) {
+    processed += `\n\n${EMOJIS.location} To get specific weather information, please allow location access or tell me which city you'd like weather for!`;
+  }
+
+  // Clean up formatting
   processed = processed.replace(/\n\n\n+/g, '\n\n');
-  
-  // Ensure proper spacing after periods
   processed = processed.replace(/\.([A-Z])/g, '. $1');
-
-  // Add some visual breaks for readability
-  processed = processed.replace(/\n\n/g, '\n\n');
-
-  return processed.trim();
-}
-
-// Helper function to add contextual emphasis based on weather conditions
-function addContextualEmphasis(text, weatherData) {
-  if (!weatherData?.current) return text;
-
-  const condition = weatherData.current.condition?.toLowerCase() || '';
-  const temp = weatherData.current.temperature || 70;
-
-  // Add temperature context
-  if (temp > 85) {
-    text = text.replace(/hot|warm|heat/gi, match => `${match} (quite toasty!)`);
-  } else if (temp < 32) {
-    text = text.replace(/cold|freeze|freezing|ice/gi, match => `${match} (bundle up!)`);
-  }
-
-  // Add condition-specific context
-  if (condition.includes('rain')) {
-    text = text.replace(/rain|shower|drizzle/gi, match => `${match} (grab an umbrella!)`);
-  }
-  if (condition.includes('snow')) {
-    text = text.replace(/snow|blizzard/gi, match => `${match} (winter wonderland!)`);
-  }
-  if (condition.includes('thunder')) {
-    text = text.replace(/thunder|lightning/gi, match => `${match} (stay indoors!)`);
-  }
-  if (condition.includes('wind')) {
-    text = text.replace(/wind|windy|gusty/gi, match => `${match} (hold onto your hat!)`);
-  }
-
-  return text;
-}
