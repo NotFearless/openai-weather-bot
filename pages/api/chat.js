@@ -1,5 +1,5 @@
 import { generateWeatherResponse, generateEnhancedWeatherResponse } from '../../lib/openai';
-import { getCurrentWeather, getWeatherForecast, getWeatherAlerts, getCompleteWeatherData, searchLocation } from '../../lib/weather';
+import { getCurrentWeather, getWeatherForecast, getNWSAlerts, getCompleteWeatherData, searchLocation, extractLocationFromMessage } from '../../lib/weather';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -15,58 +15,113 @@ export default async function handler(req, res) {
 
     let weatherData = null;
     let locationData = null;
+    let searchedLocation = null;
 
-    // Check if user is asking about a specific location
-    const locationMatch = extractLocationFromMessage(message);
+    // Step 1: Check if user is asking about a specific location
+    const locationFromMessage = extractLocationFromMessage(message);
     
-    if (locationMatch) {
+    if (locationFromMessage) {
+      console.log(`Extracted location from message: ${locationFromMessage}`);
+      
       // Search for the mentioned location
-      const searchResult = await searchLocation(locationMatch);
+      const searchResult = await searchLocation(locationFromMessage);
       if (searchResult.success && searchResult.data.length > 0) {
-        locationData = searchResult.data[0];
+        locationData = searchResult.data[0]; // Use the best match
+        searchedLocation = locationFromMessage;
+        console.log(`Found location: ${locationData.displayName}`);
+      } else {
+        console.log(`Could not find location: ${locationFromMessage}`);
       }
     }
 
-    // Use the found location or fallback to user's current location
+    // Step 2: Use the found location or fallback to user's current location
     const targetLocation = locationData || location;
 
     if (targetLocation?.lat && targetLocation?.lon) {
       try {
-        // Check if user is asking about alerts/warnings specifically
-        const needsAlerts = /\b(watch|warning|alert|advisory|severe|storm|tornado|hurricane|flood)\b/i.test(message);
-        
+        // Step 3: Check what type of data the user is asking for
+        const needsAlerts = /\b(watch|warning|alert|advisory|severe|storm|tornado|hurricane|flood|emergency)\b/i.test(message);
+        const needsForecast = /\b(forecast|tomorrow|week|days|upcoming|future)\b/i.test(message);
+        const needsCurrent = /\b(now|current|today|right now|currently)\b/i.test(message) || (!needsAlerts && !needsForecast);
+
+        console.log(`Data needs - Alerts: ${needsAlerts}, Forecast: ${needsForecast}, Current: ${needsCurrent}`);
+
         if (needsAlerts) {
           // Get complete weather data including alerts
-          const completeData = await getCompleteWeatherData(targetLocation.lat, targetLocation.lon);
+          const completeData = await getCompleteWeatherData(targetLocation.lat, targetLocation.lon, true);
           if (completeData.success) {
-            weatherData = completeData.data;
+            weatherData = {
+              ...completeData.data,
+              requestType: 'alerts',
+              searchedLocation: searchedLocation,
+              locationUsed: locationData ? locationData.displayName : 'current location'
+            };
           }
-        } else {
-          // Get basic weather data
+        } else if (needsForecast && needsCurrent) {
+          // Get both current and forecast
           const [currentWeather, forecast] = await Promise.all([
             getCurrentWeather(targetLocation.lat, targetLocation.lon),
             getWeatherForecast(targetLocation.lat, targetLocation.lon)
           ]);
 
-          if (currentWeather.success || forecast.success) {
-            weatherData = {
-              current: currentWeather.success ? currentWeather.data : null,
-              forecast: forecast.success ? forecast.data : null,
-              location: targetLocation
-            };
-          }
+          weatherData = {
+            current: currentWeather.success ? currentWeather.data : null,
+            forecast: forecast.success ? forecast.data : null,
+            requestType: 'current+forecast',
+            searchedLocation: searchedLocation,
+            locationUsed: locationData ? locationData.displayName : 'current location'
+          };
+        } else if (needsForecast) {
+          // Get forecast only
+          const forecast = await getWeatherForecast(targetLocation.lat, targetLocation.lon);
+          weatherData = {
+            forecast: forecast.success ? forecast.data : null,
+            requestType: 'forecast',
+            searchedLocation: searchedLocation,
+            locationUsed: locationData ? locationData.displayName : 'current location'
+          };
+        } else {
+          // Get current weather only
+          const currentWeather = await getCurrentWeather(targetLocation.lat, targetLocation.lon);
+          weatherData = {
+            current: currentWeather.success ? currentWeather.data : null,
+            requestType: 'current',
+            searchedLocation: searchedLocation,
+            locationUsed: locationData ? locationData.displayName : 'current location'
+          };
         }
       } catch (weatherError) {
-        console.log('Weather API failed, continuing without weather data:', weatherError.message);
+        console.log('Weather API failed:', weatherError.message);
+        weatherData = {
+          error: 'Weather data unavailable',
+          searchedLocation: searchedLocation,
+          locationUsed: locationData ? locationData.displayName : 'current location'
+        };
+      }
+    } else {
+      console.log('No valid coordinates found');
+      if (searchedLocation) {
+        weatherData = {
+          error: `Could not find coordinates for "${searchedLocation}"`,
+          searchedLocation: searchedLocation
+        };
       }
     }
 
-    // Generate AI response with enhanced context
+    // Step 4: Generate AI response with context
     const enhancedContext = {
       ...weatherData,
-      requestedLocation: locationData?.displayName || null,
-      searchedFor: locationMatch || null
+      userMessage: message,
+      hasLocationSwitch: !!locationData,
+      originalLocation: location,
+      targetLocation: targetLocation
     };
+
+    console.log('Sending to AI:', {
+      message,
+      contextKeys: Object.keys(enhancedContext),
+      locationUsed: enhancedContext.locationUsed
+    });
 
     const aiResponse = await generateWeatherResponse(message, enhancedContext, conversationHistory);
 
@@ -77,7 +132,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Generate enhanced response with images
+    // Step 5: Generate enhanced response with images
     let imageResults = { images: {}, hasImages: false };
     
     if (weatherData && includeImages) {
@@ -95,6 +150,7 @@ export default async function handler(req, res) {
       images: imageResults.images,
       hasImages: imageResults.hasImages,
       locationFound: locationData,
+      searchedFor: searchedLocation,
       usage: aiResponse.usage
     });
 
@@ -105,28 +161,4 @@ export default async function handler(req, res) {
       fallback: "I'm experiencing technical difficulties. Please try again in a moment."
     });
   }
-}
-
-// Helper function to extract location from user message
-function extractLocationFromMessage(message) {
-  // Look for location patterns
-  const patterns = [
-    /(?:in|for|at|near)\s+([A-Za-z\s,]+?)(?:\s|$|[?.!])/i,
-    /([A-Za-z\s,]+?)\s+(?:weather|forecast|alerts?|warnings?)/i,
-    /weather\s+(?:in|for|at|near)\s+([A-Za-z\s,]+?)(?:\s|$|[?.!])/i
-  ];
-
-  for (const pattern of patterns) {
-    const match = message.match(pattern);
-    if (match && match[1]) {
-      const location = match[1].trim();
-      // Filter out common words that aren't locations
-      const excludeWords = ['the', 'this', 'that', 'current', 'today', 'tomorrow', 'now'];
-      if (!excludeWords.includes(location.toLowerCase()) && location.length > 2) {
-        return location;
-      }
-    }
-  }
-
-  return null;
 }
