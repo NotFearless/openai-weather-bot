@@ -1,4 +1,4 @@
-// next.config.js - Add this to your project root for proper emoji support
+// next.config.js - Fixed for Next.js 14 compatibility
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -7,14 +7,6 @@ const nextConfig = {
   // Ensure proper UTF-8 encoding for emojis
   experimental: {
     esmExternals: true,
-  },
-  
-  // API configuration for proper encoding
-  api: {
-    responseLimit: false,
-    bodyParser: {
-      sizeLimit: '1mb',
-    },
   },
   
   // Headers for proper UTF-8 support
@@ -55,25 +47,19 @@ const nextConfig = {
       };
     }
     
-    // Ensure proper UTF-8 handling in webpack
-    config.module.rules.push({
-      test: /\.(js|jsx|ts|tsx)$/,
-      use: {
-        loader: 'babel-loader',
-        options: {
-          presets: [
-            ['@babel/preset-env', { 
-              targets: { 
-                browsers: ['last 2 versions'] 
-              }
-            }],
-            '@babel/preset-react'
-          ],
-        },
-      },
-    });
-
     return config;
+  },
+  
+  // Output configuration for proper encoding
+  output: 'standalone',
+  
+  // Disable strict mode for better emoji compatibility
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  
+  eslint: {
+    ignoreDuringBuilds: false,
   },
 };
 

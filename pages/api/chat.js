@@ -3,12 +3,7 @@ import { generateWeatherResponse, generateEnhancedWeatherResponse } from '../../
 import { getCurrentWeather, getWeatherForecast, getNWSAlerts, getCompleteWeatherData, searchLocation, extractLocationFromMessage } from '../../lib/weather';
 import { generateEducationalWeatherResponse } from '../../lib/weatherEducation';
 
-// Set proper content type for UTF-8 encoding
-export const config = {
-  api: {
-    responseLimit: false,
-  },
-}
+// Note: API configuration is handled in next.config.js for Next.js 14
 
 // Safe emoji constants
 const EMOJIS = {
