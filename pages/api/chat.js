@@ -1,4 +1,4 @@
-// pages/api/chat.js - Complete full file with all location switching fixes
+// pages/api/chat.js - Fixed with proper educational/forecast separation
 import { generateWeatherResponse, generateEnhancedWeatherResponse } from '../../lib/openai';
 import { getCurrentWeather, getWeatherForecast, getNWSAlerts, getCompleteWeatherData, searchLocation, extractLocationFromMessage } from '../../lib/weather';
 import { generateEducationalWeatherResponse } from '../../lib/weatherEducation';
@@ -24,6 +24,146 @@ const EMOJIS = {
   magnify: '🔍'
 };
 
+// SEPARATE EDUCATIONAL PATHWAY - Complete isolation from weather forecasting
+async function isEducationalWeatherQuestion(message) {
+  const educationalPatterns = [
+    // Direct educational questions
+    /^(?:explain|what|how|why|describe|tell me about|define|help me understand)\s+/i,
+    
+    // Question patterns
+    /\b(?:is|are|means?|definition|explanation|simple terms|eli5|basics?)\b/i,
+    
+    // Educational topics
+    /\b(?:causes?|effects?|happens?|works?|forms?|develops?|occurs?)\b/i,
+    
+    // Weather phenomena (educational context)
+    /\b(?:el ni[ñn]o|la ni[ñn]a|hurricane|tornado|cyclone|typhoon|monsoon|blizzard)\b/i,
+    
+    // Weather concepts
+    /\b(?:barometric pressure|humidity|dewpoint|heat index|wind chill|jet stream|front|system)\b/i,
+    
+    // Climate topics
+    /\b(?:climate change|global warming|greenhouse effect|ozone|atmosphere|weather patterns)\b/i,
+    
+    // Educational keywords
+    /\b(?:difference between|types? of|kinds? of|examples? of|classification|categories)\b/i,
+    
+    // Science explanations
+    /\b(?:science|physics|meteorology|atmospheric|phenomenon|process|cycle)\b/i
+  ];
+  
+  const isEducational = educationalPatterns.some(pattern => pattern.test(message.toLowerCase()));
+  
+  // Also check if it's asking about weather concepts without location
+  const hasWeatherConcepts = /\b(?:weather|climate|storm|rain|snow|wind|temperature|pressure|humidity)\b/i.test(message);
+  const hasLocationIndicators = /\b(?:in|at|for|near)\s+[A-Za-z]/i.test(message);
+  const hasCurrentTimeIndicators = /\b(?:now|today|tonight|tomorrow|currently|right now|this week)\b/i.test(message);
+  
+  // If it has weather concepts but no location/time indicators, it's likely educational
+  if (hasWeatherConcepts && !hasLocationIndicators && !hasCurrentTimeIndicators && isEducational) {
+    return true;
+  }
+  
+  return isEducational;
+}
+
+// Handle educational queries completely separately
+async function handleEducationalQuery(message, conversationHistory, includeImages, res) {
+  console.log('🎓 Processing educational query:', message);
+  
+  try {
+    // Generate educational response
+    let educationalResponse = null;
+    let imageResults = { images: {}, hasImages: false };
+    
+    if (includeImages) {
+      try {
+        educationalResponse = await generateEducationalWeatherResponse(
+          message,
+          null, // No weather data needed for educational
+          conversationHistory,
+          null // No location needed
+        );
+        
+        if (educationalResponse && educationalResponse.images) {
+          imageResults = {
+            images: educationalResponse.images,
+            hasImages: Object.keys(educationalResponse.images).length > 0,
+            isEducational: true,
+            educationalTopic: educationalResponse.topic
+          };
+        }
+      } catch (imageError) {
+        console.error('❌ Educational image generation failed:', imageError);
+        // Continue without images
+      }
+    }
+    
+    // Generate AI response for educational content
+    const educationalContext = {
+      userMessage: message,
+      isEducational: true,
+      educationalTopic: educationalResponse?.topic || 'weather-education',
+      hasEducationalImages: imageResults.hasImages,
+      requestType: 'educational',
+      processingComplete: true,
+      timestamp: new Date().toISOString()
+    };
+    
+    const aiResponse = await generateWeatherResponse(message, educationalContext, conversationHistory);
+    
+    if (!aiResponse.success) {
+      return res.status(200).json({
+        response: `I'd be happy to explain that weather concept! However, I'm having some technical difficulties generating a detailed explanation right now. ${EMOJIS.warning} Could you try asking again in a moment?`,
+        weatherData: null,
+        images: imageResults.images,
+        hasImages: imageResults.hasImages,
+        isEducational: true,
+        educationalTopic: educationalResponse?.topic,
+        locationFound: null,
+        searchedFor: null,
+        usage: null
+      });
+    }
+    
+    // Process educational response
+    let processedResponse = processFriendlyResponse(aiResponse.response, educationalContext);
+    
+    console.log('✅ Educational response ready');
+    
+    return res.status(200).json({
+      response: processedResponse,
+      weatherData: educationalContext,
+      images: imageResults.images,
+      hasImages: imageResults.hasImages,
+      isEducational: true,
+      educationalTopic: imageResults.educationalTopic,
+      locationFound: null,
+      searchedFor: null,
+      usage: aiResponse.usage,
+      metadata: {
+        processingType: 'educational',
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Educational processing error:', error);
+    return res.status(200).json({
+      response: `I'd love to help explain weather concepts! Unfortunately, I'm having some technical difficulties right now. ${EMOJIS.warning} Please try your question again in a moment.`,
+      weatherData: null,
+      images: {},
+      hasImages: false,
+      isEducational: true,
+      educationalTopic: null,
+      locationFound: null,
+      searchedFor: null,
+      usage: null,
+      error: 'Educational processing failed'
+    });
+  }
+}
+
 export default async function handler(req, res) {
   // Set proper headers for UTF-8 encoding
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -42,40 +182,26 @@ export default async function handler(req, res) {
     console.log('🔄 Processing message:', message);
     console.log('📍 User location:', location ? `${location.lat}, ${location.lon}` : 'Not available');
 
+    // STEP 1: FIRST PRIORITY - Determine if this is an educational question
+    const isEducationalQuery = await isEducationalWeatherQuestion(message);
+    
+    if (isEducationalQuery) {
+      console.log('🎓 EDUCATIONAL PATHWAY - Processing educational weather question');
+      return await handleEducationalQuery(message, conversationHistory, includeImages, res);
+    }
+
+    console.log('🌤️ WEATHER FORECAST PATHWAY - Processing weather/location request');
+
     // Initialize response data - CLEAR PREVIOUS STATE COMPLETELY
     let weatherData = null;
     let locationData = null;
     let searchedLocation = null;
     let usedUserLocation = false;
-    let educationalResponse = null;
-
-    // Step 1: Check if this is an educational weather query FIRST
-    try {
-      if (includeImages) {
-        educationalResponse = await generateEducationalWeatherResponse(
-          message, 
-          null, // Pass null initially, will be filled later if needed
-          conversationHistory, 
-          location
-        );
-        console.log('📚 Educational response:', educationalResponse?.isEducational);
-      }
-    } catch (error) {
-      console.error('❌ Educational response error:', error);
-      // Continue processing even if educational fails
-    }
 
     // Step 2: SMART location detection - Only for weather-related queries
     const locationFromMessage = extractLocationFromMessage(message);
     
-    // Check if this is an educational question that shouldn't trigger location search
-    const isEducationalQuery = /^(?:explain|what|how|why|describe|tell me about|define)\s+/i.test(message) ||
-                              /\b(?:is|are|means?|definition|explanation|simple terms|eli5)\b/i.test(message);
-    
-    if (isEducationalQuery) {
-      console.log('🎓 Educational query detected - skipping location processing');
-      // Continue to educational processing without location search
-    } else if (locationFromMessage) {
+    if (locationFromMessage) {
       console.log('🎯 Location extracted from message:', locationFromMessage);
       
       try {
@@ -124,9 +250,10 @@ export default async function handler(req, res) {
         });
       }
     }
+
     // Step 3: Handle different message types appropriately
-    if (!isEducationalQuery && !locationFromMessage) {
-      // No location in message and not educational, use user's current location if available
+    if (!locationFromMessage) {
+      // No location in message, use user's current location if available
       if (location?.lat && location?.lon) {
         usedUserLocation = true;
         console.log('📍 Using user current location:', `${location.lat}, ${location.lon}`);
@@ -143,7 +270,7 @@ export default async function handler(req, res) {
     console.log('📂 Location source:', locationSource);
 
     // Step 5: Determine what weather data we need based on the query
-    const needsWeatherData = /\b(weather|temperature|temp|rain|snow|wind|humidity|forecast|alert|warning|storm|cloudy|sunny|conditions|hot|cold|warm|cool)\b/i.test(message) && !isEducationalQuery;
+    const needsWeatherData = /\b(weather|temperature|temp|rain|snow|wind|humidity|forecast|alert|warning|storm|cloudy|sunny|conditions|hot|cold|warm|cool)\b/i.test(message);
     
     if (needsWeatherData && targetLocation?.lat && targetLocation?.lon) {
       console.log('🌤️ Weather data requested, fetching for:', targetLocation);
@@ -251,14 +378,11 @@ export default async function handler(req, res) {
       originalLocation: location,
       targetLocation: targetLocation,
       locationSource: locationSource,
-      // Add educational context
-      isEducational: educationalResponse?.isEducational || false,
-      educationalTopic: educationalResponse?.topic,
-      hasEducationalImages: educationalResponse?.hasImages || false,
       // Add processing status
       dataFetched: !!weatherData,
       processingComplete: true,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isEducational: false // This is the weather forecast pathway
     };
 
     console.log('🤖 Sending to AI with context:', {
@@ -296,17 +420,11 @@ export default async function handler(req, res) {
           includeImages
         );
 
-        // Combine with educational images
-        const combinedImages = {
-          ...regularImages.images,
-          ...(educationalResponse?.images || {})
-        };
-
         imageResults = {
-          images: combinedImages,
-          hasImages: Object.keys(combinedImages).length > 0,
-          isEducational: educationalResponse?.isEducational || false,
-          educationalTopic: educationalResponse?.topic
+          images: regularImages.images,
+          hasImages: Object.keys(regularImages.images).length > 0,
+          isEducational: false,
+          educationalTopic: null
         };
       } catch (imageError) {
         console.error('❌ Image processing error:', imageError);
