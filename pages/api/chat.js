@@ -65,10 +65,17 @@ export default async function handler(req, res) {
       // Continue processing even if educational fails
     }
 
-    // Step 2: ALWAYS check for location in message FIRST (highest priority)
+    // Step 2: SMART location detection - Only for weather-related queries
     const locationFromMessage = extractLocationFromMessage(message);
     
-    if (locationFromMessage) {
+    // Check if this is an educational question that shouldn't trigger location search
+    const isEducationalQuery = /^(?:explain|what|how|why|describe|tell me about|define)\s+/i.test(message) ||
+                              /\b(?:is|are|means?|definition|explanation|simple terms|eli5)\b/i.test(message);
+    
+    if (isEducationalQuery) {
+      console.log('🎓 Educational query detected - skipping location processing');
+      // Continue to educational processing without location search
+    } else if (locationFromMessage) {
       console.log('🎯 Location extracted from message:', locationFromMessage);
       
       try {
@@ -116,8 +123,10 @@ export default async function handler(req, res) {
           usage: null
         });
       }
-    } else {
-      // Step 3: No location in message, use user's current location if available
+    }
+    // Step 3: Handle different message types appropriately
+    if (!isEducationalQuery && !locationFromMessage) {
+      // No location in message and not educational, use user's current location if available
       if (location?.lat && location?.lon) {
         usedUserLocation = true;
         console.log('📍 Using user current location:', `${location.lat}, ${location.lon}`);
@@ -134,7 +143,7 @@ export default async function handler(req, res) {
     console.log('📂 Location source:', locationSource);
 
     // Step 5: Determine what weather data we need based on the query
-    const needsWeatherData = /\b(weather|temperature|temp|rain|snow|wind|humidity|forecast|alert|warning|storm|cloudy|sunny|conditions|hot|cold|warm|cool)\b/i.test(message);
+    const needsWeatherData = /\b(weather|temperature|temp|rain|snow|wind|humidity|forecast|alert|warning|storm|cloudy|sunny|conditions|hot|cold|warm|cool)\b/i.test(message) && !isEducationalQuery;
     
     if (needsWeatherData && targetLocation?.lat && targetLocation?.lon) {
       console.log('🌤️ Weather data requested, fetching for:', targetLocation);
